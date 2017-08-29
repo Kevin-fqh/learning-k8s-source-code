@@ -183,7 +183,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		Do()
 	
 ```
-### [1] func (f *factory) UnstructuredObject()
+### func (f *factory) UnstructuredObject()
 ```go
 /*
 	func (f *factory) UnstructuredObject()
@@ -236,7 +236,7 @@ mapper is:  {DeferredDiscoveryRESTMapper{
 typer is:  &{map[{policy v1beta1 PodDisruptionBudget}:true { v1 Secret}:true {certificates.k8s.io v1alpha1 CertificateSigningRequest}:true {extensions v1beta1 DeploymentRollback}:true { v1 ConfigMap}:true { v1 Eviction}:true { v1 PodTemplate}:true {apps v1beta1 StatefulSet}:true {authorization.k8s.io v1beta1 SelfSubjectAccessReview}:true {authorization.k8s.io v1beta1 SubjectAccessReview}:true { v1 ReplicationController}:true {extensions v1beta1 Scale}:true {extensions v1beta1 Job}:true {extensions v1beta1 NetworkPolicy}:true {rbac.authorization.k8s.io v1alpha1 Role}:true { v1 LimitRange}:true { v1 PersistentVolumeClaim}:true {authentication.k8s.io v1beta1 TokenReview}:true {extensions v1beta1 Deployment}:true {rbac.authorization.k8s.io v1alpha1 RoleBinding}:true {storage.k8s.io v1beta1 StorageClass}:true { v1 Binding}:true { v1 ComponentStatus}:true { v1 Node}:true {extensions v1beta1 DaemonSet}:true {extensions v1beta1 ReplicationControllerDummy}:true {rbac.authorization.k8s.io v1alpha1 ClusterRoleBinding}:true { v1 PersistentVolume}:true { v1 Pod}:true { v1 ResourceQuota}:true {autoscaling v1 HorizontalPodAutoscaler}:true {rbac.authorization.k8s.io v1alpha1 ClusterRole}:true { v1 Endpoints}:true { v1 Service}:true {extensions v1beta1 HorizontalPodAutoscaler}:true {extensions v1beta1 ReplicaSet}:true { v1 Scale}:true {extensions v1beta1 ThirdPartyResource}:true { v1 Event}:true { v1 Namespace}:true { v1 ServiceAccount}:true {authorization.k8s.io v1beta1 LocalSubjectAccessReview}:true {batch v1 Job}:true {extensions v1beta1 Ingress}:true]}
 ```
 
-## [2] 过滤函数和过滤参数
+## 过滤函数和过滤参数
 /pkg/kubectl/resource_filter.go  中的过滤函数
 ```go
 /*
