@@ -135,9 +135,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		typer:
 			map[{apps v1beta1 StatefulSet}:true {authorization.k8s.io v1beta1 SubjectAccessReview}:true
 	*/
-	mapper, typer, err := f.UnstructuredObject() [1]
+	mapper, typer, err := f.UnstructuredObject() [1](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/kubectl/kubectl主体流程走读.md#func-f-factory-unstructuredobject)
 	//获取过滤函数集合、过滤参数opts
-	filterFuncs := f.DefaultResourceFilterFunc() [2]
+	filterFuncs := f.DefaultResourceFilterFunc() [2](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/kubectl/kubectl主体流程走读.md#过滤函数和过滤参数)
 	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
 
 	/*
