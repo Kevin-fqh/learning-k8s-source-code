@@ -2,8 +2,7 @@
 ## /cmd/kubectl/app/kubectl.go
 	定义了一个cmd，然后执行cmd.Execute()
 	这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具
-`
-	func Run() error {
+`func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
@@ -18,11 +17,9 @@
 	*/
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
-	}
-`	
+	}`	
 ## /pkg/kubectl/cmd/util/factory.go
-`
-	// NewFactory creates a factory with the default Kubernetes resources defined
+`	// NewFactory creates a factory with the default Kubernetes resources defined
 	// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 	// if optionalClientConfig is not nil, then this factory will make use of it.
 	/*
@@ -55,11 +52,9 @@
 	}
 
 	return f
-	}
-`
+	}`
 ## /pkg/kubectl/cmd/cmd.go
-`
-	NewKubectlCommand创建kubectl命令及其嵌套子命令。
+`	NewKubectlCommand创建kubectl命令及其嵌套子命令。
 func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command{
 	/*
 		声明了多组 命令集合
@@ -81,14 +76,11 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		其完成的功能是把上面声明的所有命令(create、delete等)添加到kubectl下，成为kubectl的二级子命令
 	*/
 	groups.Add(cmds)
-	}
-`
+	}`
 	下面以get 命令为例子，go on
 
 ## /pkg/kubectl/cmd/get.go
-`
-	//从server段获取数据
-	func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command
-`
+`	//从server段获取数据
+	func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command`
 	
 	
