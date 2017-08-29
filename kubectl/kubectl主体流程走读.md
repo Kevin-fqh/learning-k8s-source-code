@@ -1,8 +1,9 @@
 # First Blood
 ## /cmd/kubectl/app/kubectl.go
-	定义了一个cmd，然后执行cmd.Execute()
-	这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具
-`func Run() error {
+定义了一个cmd，然后执行cmd.Execute()
+这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具
+```go
+func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
@@ -17,7 +18,8 @@
 	*/
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
-	}`	
+}
+```	
 ## /pkg/kubectl/cmd/util/factory.go
 `	// NewFactory creates a factory with the default Kubernetes resources defined
 	// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
