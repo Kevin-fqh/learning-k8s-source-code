@@ -1,4 +1,4 @@
-# First Blood
+# kubectl主体流程走读
 ## /cmd/kubectl/app/kubectl.go
 定义了一个cmd，然后执行cmd.Execute()
 这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具
@@ -21,15 +21,16 @@ func Run() error {
 }
 ```	
 ## /pkg/kubectl/cmd/util/factory.go
-`	// NewFactory creates a factory with the default Kubernetes resources defined
-	// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
-	// if optionalClientConfig is not nil, then this factory will make use of it.
-	/*
+```go
+// NewFactory creates a factory with the default Kubernetes resources defined
+// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
+// if optionalClientConfig is not nil, then this factory will make use of it.
+/*
 	译：func NewFactory用默认kubernetes resourecs 创建一个factory。
 	   如果入参optionalClientConfig为nil，flags会被绑定到一个新的clientcmd.ClientConfig。
 	   如果入参optionalClientConfig非nil，该factory会使用它。
-	*/
-	func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
+*/
+func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
@@ -42,7 +43,7 @@ func Run() error {
 	}
 
 	/*
-		获取一个ClientCache
+		获取clients,type ClientCache struct
 		type ClientCache struct 缓存先前加载的clients以便重用，并确保MatchServerVersion仅被调用一次
 	*/
 	clients := NewClientCache(clientConfig)
@@ -54,10 +55,25 @@ func Run() error {
 	}
 
 	return f
-	}`
+}
+```
+其中type ClientCache struct提供的一个方法是：
+```go
+//根据指定的version初始化或者重用一个clientset
+func (c *ClientCache) ClientSetForVersion(requiredVersion *unversioned.GroupVersion) (*internalclientset.Clientset, error)
+```
+
 ## /pkg/kubectl/cmd/cmd.go
-`	NewKubectlCommand创建kubectl命令及其嵌套子命令。
-func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command{
+```go
+//NewKubectlCommand创建`kubectl`命令及其嵌套子命令。
+func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+	/*
+		kubectl 命令，根命令
+	*/
+	cmds := &cobra.Command{
+		......
+	}
+
 	/*
 		声明了多组 命令集合
 		是对"github.com/spf13/cobra"的再一次封装
@@ -67,10 +83,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
 		所有的命令都与入参f cmdutil.Factory有关，顺着f的数据流向搞懂factory的原理
 	*/
-	groups := templates.CommandGroups{
-		......
-	}
-	
+	groups := templates.CommandGroups{......}
 	/*
 		Add定义在/pkg/kubectl/cmd/templates/command_groups.go
 			==>func (g CommandGroups) Add(c *cobra.Command)
@@ -78,11 +91,40 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		其完成的功能是把上面声明的所有命令(create、delete等)添加到kubectl下，成为kubectl的二级子命令
 	*/
 	groups.Add(cmds)
-	}`
-	下面以get 命令为例子，go on
+	return cmds
+```
+下面以get 命令为例子，go on
 
 ## /pkg/kubectl/cmd/get.go
-`	//从server段获取数据
-	func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command`
+```go
+//从server段获取数据
+func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
+
+		Run: func(cmd *cobra.Command, args []string) {
+			err := RunGet(f, out, errOut, cmd, args, options)
+			cmdutil.CheckErr(err)
+		},
+	}
+	/*
+		通过调用package cmdutil 中的函数来给一个cmd添加flag
+		或者直接添加flag
+	*/
+	cmdutil.AddPrinterFlags(cmd)
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	.......
+	return cmd
+}
+```
+RunGet函数是kubectl get命令真正执行的实体
+```go
+func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+	/*
+		eg: kubectl get po --namespace=kube-system
+			options 为空
+		len(options.Raw)＝0
+	*/
+```
 	
 	
