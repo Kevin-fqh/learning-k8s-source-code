@@ -1,4 +1,4 @@
-# kubectl主体流程走读
+# kubectl主体流程
 ## /cmd/kubectl/app/kubectl.go
 定义了一个cmd，然后执行cmd.Execute()
 这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具
@@ -455,4 +455,11 @@ type Info struct {
 	a info's VersionedObject TypeOf is: <nil>
 	a info's VersionedObject ValueOf is: <invalid reflect.Value>
 ```
-
+# 总结
+至此kubectl的主体流程已经结束，下一步我们将要详细分析
+- cmdutil.Factory
+- mapper, typer
+- Builder
+- type Result struct
+- type Result struct里面的visitor Visitor
+- printer
