@@ -1,13 +1,13 @@
 # kubectl主体流程
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [kubectl主命令开始的地方](#/cmd/kubectl/app/kubectl.go)
-  - [func NewFactory](#/pkg/kubectl/cmd/util/factory.go)
-  - [kubectl get 为例](#/pkg/kubectl/cmd/get.go)
-    - [UnstructuredObject](#func (f *factory) UnstructuredObject())
+  - [kubectl主命令开始的地方-/cmd/kubectl/app/kubectl.go]()
+  - [func NewFactory-/pkg/kubectl/cmd/util/factory.go]()
+  - [kubectl get 为例-/pkg/kubectl/cmd/get.go]()
+    - [func (f *factory) UnstructuredObject()]()
     - [过滤函数和过滤参数](#过滤函数和过滤参数)
-    - [Builder](#Builder)
-    - [infos](#infos)
+    - [Builder]()
+    - [infos]()
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
