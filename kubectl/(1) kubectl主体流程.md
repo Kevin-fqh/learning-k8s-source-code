@@ -1,4 +1,17 @@
 # kubectl主体流程
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [kubectl主命令开始的地方](#/cmd/kubectl/app/kubectl.go)
+  - [func NewFactory](#/pkg/kubectl/cmd/util/factory.go)
+  - [kubectl get 为例](#/pkg/kubectl/cmd/get.go)
+    - [UnstructuredObject](#func (f *factory) UnstructuredObject())
+    - [过滤函数和过滤参数](#过滤函数和过滤参数)
+    - [Builder](#Builder)
+    - [infos](#infos)
+  - [总结](#总结)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## /cmd/kubectl/app/kubectl.go
 定义了一个cmd，然后执行cmd.Execute()
 这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具。
