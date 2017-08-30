@@ -1,7 +1,7 @@
 # kubectl主体流程
 ## /cmd/kubectl/app/kubectl.go
 定义了一个cmd，然后执行cmd.Execute()
-这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具
+这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具。
 kubectl是基于其来构造生成命令行的
 ```go
 func Run() error {
@@ -456,7 +456,7 @@ type Info struct {
 	a info's VersionedObject ValueOf is: <invalid reflect.Value>
 ```
 # 总结
-至此kubectl的主体流程已经结束，下一步我们将要详细分析
+至此kubectl的主体流程已经结束，下一步我们将要详细分析几个核心点
 - cmdutil.Factory
 - mapper, typer
 - Builder
