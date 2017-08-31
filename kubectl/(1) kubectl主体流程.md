@@ -1,18 +1,21 @@
 # kubectl主体流程
+
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [kubectl主命令开始的地方-/cmd/kubectl/app/kubectl.go]
-  - [func NewFactory-/pkg/kubectl/cmd/util/factory.go]
-  - [kubectl get 为例-/pkg/kubectl/cmd/get.go]
+  - [kubectl主命令开始的地方](#kubectl开始run)
+  - [func NewFactory](#cmd-factory)
+  - [创建kubectl命令](#创建kubectl命令)
+  - [kubectl get 为例](#添加get命令)
     - [func (f *factory) UnstructuredObject()]
-    - [过滤函数和过滤参数](#过滤函数和过滤参数)
+    - [过滤函数和过滤参数]
     - [Builder]
     - [infos]
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-## /cmd/kubectl/app/kubectl.go
+## kubectl开始run
+定义在/cmd/kubectl/app/kubectl.go
 定义了一个cmd，然后执行cmd.Execute()
 这里用到了第三方包"github.com/spf13/cobra"，这是一个功能强大的工具。
 kubectl是基于其来构造生成命令行的
@@ -33,8 +36,10 @@ func Run() error {
 	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
 }
-```	
-## /pkg/kubectl/cmd/util/factory.go
+```
+
+## cmd Factory
+定义在/pkg/kubectl/cmd/util/factory.go
 ```go
 // NewFactory creates a factory with the default Kubernetes resources defined
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
@@ -77,7 +82,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 func (c *ClientCache) ClientSetForVersion(requiredVersion *unversioned.GroupVersion) (*internalclientset.Clientset, error)
 ```
 
-## /pkg/kubectl/cmd/cmd.go
+## 创建kubectl命令
+定义在/pkg/kubectl/cmd/cmd.go
 ```go
 //NewKubectlCommand创建`kubectl`命令及其嵌套子命令。
 func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
@@ -109,7 +115,8 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 ```
 下面以get 命令为例子，go on！
 
-## /pkg/kubectl/cmd/get.go
+## 添加get命令
+定义在/pkg/kubectl/cmd/get.go
 ```go
 //从server端获取数据
 func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
