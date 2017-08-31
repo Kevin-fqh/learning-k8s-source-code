@@ -6,10 +6,10 @@
   - [func NewFactory](#cmd-factory)
   - [创建kubectl命令](#创建kubectl命令)
   - [kubectl get 为例](#添加get命令)
-    - [func (f *factory) UnstructuredObject()]
-    - [过滤函数和过滤参数]
-    - [Builder]
-    - [infos]
+    - func (f *factory) UnstructuredObject()
+    - 过滤函数和过滤参数
+    - Builder
+    - infos
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->

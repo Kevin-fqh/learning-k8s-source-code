@@ -7,11 +7,9 @@
 	- [type Factory interface](#type-factory-interface)
 	- [func DefaultClientConfig](#func-defaultclientconfig)
 	- [func NewClientCache](#func-newclientcache)
-  - [函数UnstructuredObject](#f函数unstructuredobject)
-
-
-
-
+  - [函数UnstructuredObject](#函数unstructuredobject)
+	- [discoveryClient是个啥](#discoveryclient是个啥)
+	- [三大函数](#三大函数)
 <!-- END MUNGE: GENERATED_TOC -->
 
 接着上一篇文章，
@@ -59,9 +57,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 - func NewClientCache
 
 ### import文件引入的init函数
-NewClientCache 定义在/pkg/kubectl/cmd/util/clientcache.go
-会有类似于apiserver 资源注册的init函数执行,
-(NewOrDie，创建了一个默认的APIRegistrationManager)
+NewClientCache 定义在/pkg/kubectl/cmd/util/clientcache.go，
+会有类似于apiserver 资源注册的init函数执行，
+NewOrDie，创建了一个默认的APIRegistrationManager。
 ```go
 "k8s.io/kubernetes/pkg/api/unversioned"
 "k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -104,7 +102,7 @@ type Factory interface {
 			(1)CommandLineLocation - 这是从命令行解析的，so it must be late bound。
 			   如果指定了这一点，则不会合并其他kubeconfig文件。 此文件必须存在。
 			(2)如果设置了$KUBECONFIG，那么它被视为应该被合并的文件之一。
-			(2)主目录位置 HomeDirectoryLocation
+			(3)主目录位置 HomeDirectoryLocation ,即${HOME}/.kube/config==>/root/.kube/config
 		2、根据此规则链中的第一个命中确定要使用的上下文---context
 			(1)命令行参数 - 再次从命令行解析，so it must be late bound
 			(2)CurrentContext from the merged kubeconfig file
@@ -191,6 +189,10 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 		它用于在你实例化加载规则后可能会更改的情况，并且你希望确保使用最新的规则。
 		在解析发生之前，将标志绑定到加载规则参数的情况下，这是非常有用的，
 		并且你希望调用代码不知道值是如何突变的，以避免将无关信息传递给调用堆栈
+
+    type DeferredLoadingClientConfig struct实现了clientcmd.ClientConfig interface
+  		==>/pkg/client/unversioned/clientcmd/client_config.go
+  			==>type ClientConfig interface
 */
 type DeferredLoadingClientConfig struct {
 	loader         ClientConfigLoader
@@ -204,9 +206,33 @@ type DeferredLoadingClientConfig struct {
 	icc InClusterConfig
 }
 ```
+type DeferredLoadingClientConfig struct实现了clientcmd.ClientConfig interface
+
+func DefaultClientConfig的返回值是一个clientcmd.ClientConfig interface，其实就是一个type DeferredLoadingClientConfig struct实体。那么clientcmd.ClientConfig到底是什么？提供了什么功能？
+```go
+// ClientConfig is used to make it easy to get an api server client
+/*
+	译：type ClientConfig interface 使得获取一个api server client更加easy
+*/
+type ClientConfig interface {
+	// RawConfig returns the merged result of all overrides
+	RawConfig() (clientcmdapi.Config, error)
+	// ClientConfig returns a complete client config
+	/*
+		返回一个完整的client config
+	*/
+	ClientConfig() (*restclient.Config, error)
+	// Namespace returns the namespace resulting from the merged
+	// result of all overrides and a boolean indicating if it was
+	// overridden
+	Namespace() (string, bool, error)
+	// ConfigAccess returns the rules for loading/persisting the config.
+	ConfigAccess() ConfigAccess
+}
+```
 
 ### func NewClientCache
-基于入参ClientConfig实例化一个type ClientCache struct 
+基于入参ClientConfig实例化一个type ClientCache struct
 ```go
 // ClientCache caches previously loaded clients for reuse, and ensures MatchServerVersion
 // is invoked only once
@@ -256,3 +282,171 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 	return NewShortcutExpander(mapper, discoveryClient), typer, nil
 }
 ```
+需要了解的关键函数和概念：
+- discoveryClient, err := f.DiscoveryClient()，discoveryClient是个啥？都有什么功能？
+- package discovery 的三大函数func GetAPIGroupResources、func GetAPIGroupResources、func NewUnstructuredObjectTyper
+- NewShortcutExpander
+
+### discoveryClient是个啥
+```go
+func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	/*
+		获取完整的cfg
+		f.clientConfig的真正实现定义在
+		==>/pkg/client/unversioned/clientcmd/merged_client_builder.go
+			==>type DeferredLoadingClientConfig struct
+	*/
+	cfg, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	/*
+		/pkg/client/typed/discovery/discovery_client.go
+			==>func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error)
+		基于指定的配置创建一个新的DiscoveryClient。
+		该DiscoveryClient可用于发现API server中支持的resources。
+	*/
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+  /*
+		cacheDir 的值:  /root/.kube/cache/discovery/localhost_8080
+					   /root/.kube/cache/discovery/kubernetes_6443
+		kubectl 用域名localhost kubernetes去和apiserver链接，后面是apiserver的端口
+	*/
+	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
+	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+}
+```
+首先来了解一下`func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error)`的返回值discovery.CachedDiscoveryInterface，定义在/pkg/client/typed/discovery/discovery_client.go。这是接口定义。从type DiscoveryInterface interface的定义可以发现，里面有个RESTClient() restclient.Interface，后面要继续研究。
+```go
+// DiscoveryInterface holds the methods that discover server-supported API groups,
+// versions and resources.
+/*
+	译：DiscoveryInterface的接口实现了：发现server端支持的API groups，versions and resources
+*/
+type DiscoveryInterface interface {
+	RESTClient() restclient.Interface
+	ServerGroupsInterface
+	ServerResourcesInterface
+	ServerVersionInterface
+	SwaggerSchemaInterface
+}
+
+// CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
+/*
+	译：CachedDiscoveryInterface是一个DiscoveryInterface，且具有Fresh()和Invalidate()方法
+*/
+type CachedDiscoveryInterface interface {
+	DiscoveryInterface
+	// Fresh returns true if no cached data was used that had been retrieved before the instantiation.
+	/*
+		如果在实例化之前没有使用已经检索到的缓存数据，则Fresh将返回true。
+	*/
+	Fresh() bool
+	// Invalidate enforces that no cached data is used in the future that is older than the current time.
+	Invalidate()
+}
+```
+
+现在让我们回到func (f *factory) DiscoveryClient()的实现过程。
+type DeferredLoadingClientConfig struct 在前面已经介绍过。
+下面来了解`discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)`
+```go
+// NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. This client
+// can be used to discover supported resources in the API server.
+/*
+	译：NewDiscoveryClientForConfig基于指定的配置创建一个新的DiscoveryClient。
+		该DiscoveryClient可用于发现API server中支持的resources。
+*/
+func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error) {
+	config := *c
+	if err := setDiscoveryDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := restclient.UnversionedRESTClientFor(&config)
+	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api"}, err
+}
+
+// DiscoveryClient implements the functions that discover server-supported API groups,
+// versions and resources.
+/*
+	译：type DiscoveryClient struct实现了发现server-supported API groups, versions and resources 的方法
+*/
+type DiscoveryClient struct {
+	restClient restclient.Interface
+
+	LegacyPrefix string
+}
+```
+最后基于生成的discoveryClient调用定义在/pkg/kubectl/cmd/util/cached_discovery.go的`func NewCachedDiscoveryClient`
+```go
+// NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
+/*
+	译：NewCachedDiscoveryClient创建一个新的DiscoveryClient。
+		属性cacheDirectory是discovery docs存储的目录。
+  		它必须是唯一的host:port组合
+*/
+func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
+	return &CachedDiscoveryClient{
+		delegate:       delegate,
+		cacheDirectory: cacheDirectory,
+		ttl:            ttl,
+		ourFiles:       map[string]struct{}{},
+		fresh:          true,
+	}
+}
+
+// CachedDiscoveryClient implements the functions that discovery server-supported API groups,
+// versions and resources.
+/*
+	译：CachedDiscoveryClient的功能是：发现server端支持的API groups，versions and resources
+*/
+type CachedDiscoveryClient struct {
+	/*
+		/pkg/client/typed/discovery/discovery_client.go
+			==>type DiscoveryInterface interface
+	*/
+	delegate discovery.DiscoveryInterface
+
+	// cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
+	/*
+		译：cacheDirectory是discovery docs存储的目录。它必须是唯一的host:port组合。
+	*/
+	cacheDirectory string
+
+	// ttl is how long the cache should be considered valid
+	/*
+		译：ttl是cache的有效时间
+	*/
+	ttl time.Duration
+
+	// mutex protects the variables below
+	/*
+		互斥保护
+	*/
+	mutex sync.Mutex
+
+	// ourFiles are all filenames of cache files created by this process
+	/*
+		译：ourFiles都是由此进程创建的缓存文件的文件名
+	*/
+	ourFiles map[string]struct{}
+	// invalidated is true if all cache files should be ignored that are not ours (e.g. after Invalidate() was called)
+	/*
+		invalidated=true，如果所有缓存文件都应该被忽略
+	*/
+	invalidated bool
+	// fresh is true if all used cache files were ours
+	/*
+		fresh=true，如果所使用的cache files是我们的
+	*/
+	fresh bool
+}
+```
+至此，func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error)基本清楚。
+下面，回到`func (f *factory) UnstructuredObject()`，准备了解定义在`/pkg/client/typed/discovery`的三大函数func GetAPIGroupResources、func GetAPIGroupResources、func NewUnstructuredObjectTyper
+
+### 三大函数
+
