@@ -1,5 +1,19 @@
 # cmdutil.Factory 解析
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [func NewFactory](#func-newfactory)
+    - [import文件引入的init函数](#import文件引入的init函数)
+	- [type Factory interface](#type-factory-interface)
+	- [func DefaultClientConfig](#func-defaultclientconfig)
+	- [func NewClientCache](#func-newclientcache)
+  - [函数UnstructuredObject](#f函数unstructuredobject)
+
+
+
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 接着上一篇文章，
 从func NewFactory出发
 ## func NewFactory
@@ -79,7 +93,7 @@ type Factory interface {
 	UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error)
 ```
 
-### func DefaultClientConfig(flags *pflag.FlagSet)
+### func DefaultClientConfig
 总结起来应该是基于默认规则loadingRules, 重写信息overrides和os.Stdin来生成ClientConfig
 ```go
 /*
@@ -212,7 +226,9 @@ type ClientCache struct {
 }
 ```
 至此func NewFactory分析完毕，下面从func RunGet的运行过程开始分析
-## f.UnstructuredObject()
+
+## 函数UnstructuredObject
+RunGet函数中调用了f.UnstructuredObject()
 ```go
 /*
 	func (f *factory) UnstructuredObject()
