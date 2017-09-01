@@ -9,6 +9,7 @@
 	- [func NewClientCache](#func-newclientcache)
   - [函数UnstructuredObject](#函数unstructuredobject)
 	- [discoveryClient是个啥](#discoveryclient是个啥)
+	  - [RESTClient](#type-restclient-struct)
 	- [三大函数](#三大函数)
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -178,7 +179,6 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	return clientConfig
 }
 
-
 // DeferredLoadingClientConfig is a ClientConfig interface that is backed by a client config loader.
 // It is used in cases where the loading rules may change after you've instantiated them and you want to be sure that
 // the most recent rules are used.  This is useful in cases where you bind flags to loading rule parameters before
@@ -255,7 +255,8 @@ type ClientCache struct {
 至此func NewFactory分析完毕，下面从func RunGet的运行过程开始分析
 
 ## 函数UnstructuredObject
-RunGet函数中调用了f.UnstructuredObject()
+RunGet函数中调用了f.UnstructuredObject()，
+定义在/pkg/kubectl/cmd/util/factory.go
 ```go
 /*
 	func (f *factory) UnstructuredObject()
@@ -284,7 +285,11 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 ```
 需要了解的关键函数和概念：
 - discoveryClient, err := f.DiscoveryClient()，discoveryClient是个啥？都有什么功能？
-- package discovery 的三大函数func GetAPIGroupResources、func GetAPIGroupResources、func NewUnstructuredObjectTyper
+	- DiscoveryClient包含的restClient作用的什么？
+- package discovery 的三大函数
+  - func GetAPIGroupResources
+  - func GetAPIGroupResources
+  - func NewUnstructuredObjectTyper
 - NewShortcutExpander
 
 ### discoveryClient是个啥
@@ -327,11 +332,14 @@ func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) 
 	译：DiscoveryInterface的接口实现了：发现server端支持的API groups，versions and resources
 */
 type DiscoveryInterface interface {
+	/*
+		RESTClient()返回一个restclient.Interface，用于与API服务器进行通信。
+	*/
 	RESTClient() restclient.Interface
-	ServerGroupsInterface
-	ServerResourcesInterface
-	ServerVersionInterface
-	SwaggerSchemaInterface
+	ServerGroupsInterface    //获取 API server支持的gropus
+	ServerResourcesInterface //获取 API server支持的resource
+	ServerVersionInterface   //获取 API server支持的version
+	SwaggerSchemaInterface   //接收和解析API server支持的swagger API
 }
 
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
@@ -353,6 +361,7 @@ type CachedDiscoveryInterface interface {
 现在让我们回到func (f *factory) DiscoveryClient()的实现过程。
 type DeferredLoadingClientConfig struct 在前面已经介绍过。
 下面来了解`discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)`
+这里的type DiscoveryClient struct实现了上面所说的type DiscoveryInterface interface
 ```go
 // NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. This client
 // can be used to discover supported resources in the API server.
@@ -362,9 +371,16 @@ type DeferredLoadingClientConfig struct 在前面已经介绍过。
 */
 func NewDiscoveryClientForConfig(c *restclient.Config) (*DiscoveryClient, error) {
 	config := *c
+	//设置默认参数
 	if err := setDiscoveryDefaults(&config); err != nil {
 		return nil, err
 	}
+	/*
+		/pkg/client/restclient/config.go
+			==>func UnversionedRESTClientFor(config *Config) (*RESTClient, error)
+		返回一个满足client Config要求的RESTClient。
+		由此方法创建的RESTClient是通用的 - 它希望可以按照Kubernetes约定的API进行操作，但可能不是Kubernetes API。
+	*/
 	client, err := restclient.UnversionedRESTClientFor(&config)
 	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api"}, err
 }
@@ -445,8 +461,123 @@ type CachedDiscoveryClient struct {
 	fresh bool
 }
 ```
+
+#### type RESTClient struct
+DiscoveryClient里面包含了一个restClient，那么这个restClient的作用的什么？
+```go
+// RESTClient imposes common Kubernetes API conventions on a set of resource paths.
+// The baseURL is expected to point to an HTTP or HTTPS path that is the parent
+// of one or more resources.  The server should return a decodable API resource
+// object, or an api.Status object which contains information about the reason for
+// any failure.
+//
+// Most consumers should use client.New() to get a Kubernetes API client.
+/*
+	译：type RESTClient struct 在一组resource paths上强加了常见的Kubernetes API约定。
+		baseURL指向作为一个或多个resources的父级resources的HTTP（HTTPS）路径。
+		server端应该返回一个可解码的API资源对象，或一个api.Status对象，其中包含有关任何故障原因的信息。
+*/
+type RESTClient struct {
+	// base is the root URL for all invocations of the client
+	base *url.URL
+	// versionedAPIPath is a path segment connecting the base URL to the resource root
+	versionedAPIPath string
+
+	// contentConfig is the information used to communicate with the server.
+	contentConfig ContentConfig
+
+	// serializers contain all serializers for underlying content type.
+	serializers Serializers
+
+	// creates BackoffManager that is passed to requests.
+	createBackoffMgr func() BackoffManager
+
+	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
+	Throttle flowcontrol.RateLimiter
+
+	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
+	Client *http.Client
+}
+```
+
 至此，func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error)基本清楚。
-下面，回到`func (f *factory) UnstructuredObject()`，准备了解定义在`/pkg/client/typed/discovery`的三大函数func GetAPIGroupResources、func GetAPIGroupResources、func NewUnstructuredObjectTyper
+DiscoveryClient通过type RESTClient struct发现server端支持的API groups，versions and resources。
+
+下面，回到`func (f *factory) UnstructuredObject()`，准备了解定义在/pkg/client/typed/discovery的三大函数func GetAPIGroupResources、func GetAPIGroupResources、func NewUnstructuredObjectTyper
 
 ### 三大函数
+1. func GetAPIGroupResources
+```go
+// GetAPIGroupResources uses the provided discovery client to gather
+// discovery information and populate a slice of APIGroupResources.
+/*
+	译：GetAPIGroupResources使用入参discoveryClient，收集discovery information并填充一个APIGroupResources切片。
+*/
+func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
+	apiGroups, err := cl.ServerGroups()
+	if err != nil {
+		return nil, err
+	}
+	var result []*APIGroupResources
+	for _, group := range apiGroups.Groups {
+		groupResources := &APIGroupResources{
+			Group:              group,
+			VersionedResources: make(map[string][]unversioned.APIResource),
+		}
+		for _, version := range group.Versions {
+			resources, err := cl.ServerResourcesForGroupVersion(version.GroupVersion)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					continue // ignore as this can race with deletion of 3rd party APIs
+				}
+				return nil, err
+			}
+			groupResources.VersionedResources[version.Version] = resources.APIResources
+		}
+		result = append(result, groupResources)
+	}
+	return result, nil
+}
+```
+2. func NewDeferredDiscoveryRESTMapper
+```go
+// NewDeferredDiscoveryRESTMapper returns a
+// DeferredDiscoveryRESTMapper that will lazily query the provided
+// client for discovery information to do REST mappings.
+/*
+	译：func NewDeferredDiscoveryRESTMapper返回一个DeferredDiscoveryRESTMapper，
+		它将懒惰地查询指定的client（也就是discoveryClient）获取discovery information，用于执行REST映射。
+*/
+func NewDeferredDiscoveryRESTMapper(cl CachedDiscoveryInterface, versionInterface meta.VersionInterfacesFunc) *DeferredDiscoveryRESTMapper {
+	return &DeferredDiscoveryRESTMapper{
+		cl:               cl,
+		versionInterface: versionInterface,
+	}
+}
+```
+3. func NewUnstructuredObjectTyper
+```go
+// NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
+// unstructred objects based on discovery information.
+/*
+	func NewUnstructuredObjectTyper 返回一个runtime.ObjectTyper（UnstructuredObjectTyper），
+	反应了discovery information的unstructred objects
+*/
+func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *UnstructuredObjectTyper {
+	dot := &UnstructuredObjectTyper{registered: make(map[unversioned.GroupVersionKind]bool)}
+	for _, group := range groupResources {
+		for _, discoveryVersion := range group.Group.Versions {
+			resources, ok := group.VersionedResources[discoveryVersion.Version]
+			if !ok {
+				continue
+			}
 
+			gv := unversioned.GroupVersion{Group: group.Group.Name, Version: discoveryVersion.Version}
+			for _, resource := range resources {
+				dot.registered[gv.WithKind(resource.Kind)] = true
+			}
+		}
+	}
+	return dot
+}
+```
