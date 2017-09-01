@@ -324,7 +324,8 @@ func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) 
 	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 ```
-首先来了解一下`func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error)`的返回值discovery.CachedDiscoveryInterface，定义在/pkg/client/typed/discovery/discovery_client.go。这是接口定义。从type DiscoveryInterface interface的定义可以发现，里面有个RESTClient() restclient.Interface，后面要继续研究。
+首先来了解一下`func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error)`的返回值discovery.CachedDiscoveryInterface，定义在/pkg/client/typed/discovery/discovery_client.go,这是接口定义。
+从type DiscoveryInterface interface的定义可以发现，里面有个RESTClient() restclient.Interface，后面要继续研究。
 ```go
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
@@ -360,7 +361,7 @@ type CachedDiscoveryInterface interface {
 
 现在让我们回到func (f *factory) DiscoveryClient()的实现过程。
 type DeferredLoadingClientConfig struct 在前面已经介绍过。
-下面来了解`discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)`
+下面来了解`discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)`,
 这里的type DiscoveryClient struct实现了上面所说的type DiscoveryInterface interface
 ```go
 // NewDiscoveryClientForConfig creates a new DiscoveryClient for the given config. This client
