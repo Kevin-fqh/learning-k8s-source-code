@@ -541,7 +541,7 @@ DiscoveryClient通过type RESTClient struct发现server端支持的API groups，
 
 下面，回到`func (f *factory) UnstructuredObject()`，准备了解定义在/pkg/client/typed/discovery的三大函数func GetAPIGroupResources、func GetAPIGroupResources、func NewUnstructuredObjectTyper
 
-### 三大函数
+### 四大函数
 #### func GetAPIGroupResources
 ```go
 // GetAPIGroupResources uses the provided discovery client to gather
