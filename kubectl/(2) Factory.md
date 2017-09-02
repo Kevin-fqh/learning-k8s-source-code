@@ -663,7 +663,7 @@ type APIGroupResources struct {
 }
 ```
 
-#### NewShortcutExpander
+#### func NewShortcutExpander
 type ShortcutExpander struct是可以用于Kubernetes资源的RESTMapper。
 把userResources、mapper、discoveryClient封装成一个ShortcutExpander结构，可以理解为就是一个简单的封装
 ```go
