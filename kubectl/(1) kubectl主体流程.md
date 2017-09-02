@@ -483,4 +483,5 @@ type Info struct {
 - type Result struct
 - type Result struct里面的visitor Visitor
 - printer
+
 我主要以`func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions)`函数的运行过程为主线，对各个概念进行了解。
