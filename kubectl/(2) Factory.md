@@ -11,6 +11,8 @@
 	- [discoveryClient是个啥](#discoveryclient是个啥)
 	  - [RESTClient](#type-restclient-struct)
 	- [三大函数](#三大函数)
+	- [NewShortcutExpander](#newshortcutexpander)
+  - [结语](#结语)
 <!-- END MUNGE: GENERATED_TOC -->
 
 接着上一篇文章，
@@ -269,8 +271,22 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 	if err != nil {
 		return nil, nil, err
 	}
+	/*
+		/pkg/client/typed/discovery/restmapper.go
+			==>func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error)
+		GetAPIGroupResources使用入参discoveryClient，收集discovery information并填充一个APIGroupResources切片。
+	*/
 	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
+	/*
+		可以认为只要cache目录下有文件存在，fresh＝false
+		如果把cache目录/root/.kube/cache/discovery/localhost_8080 删除，fresh＝true
+	*/
 	if err != nil && !discoveryClient.Fresh() {
+		/*
+			在err!=nil && fresh＝false的情况下，重新获取groupResources
+			也就是说只要fresh＝true的时候，都可以认为该groupResources是可以直接使用的
+			Invalidate()把client的属性fresh和invalidated都置为true
+		*/
 		discoveryClient.Invalidate()
 		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
 	}
@@ -278,8 +294,25 @@ func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, er
 		return nil, nil, err
 	}
 
+	/*
+		/pkg/client/typed/discovery/restmapper.go
+			==>func NewDeferredDiscoveryRESTMapper
+		利用discoveryClient获取discovery information，用于执行REST映射，返回一个DeferredDiscoveryRESTMapper
+	*/
 	mapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
+	/*
+		/pkg/client/typed/discovery/unstructured.go
+			==>func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *UnstructuredObjectTyper
+		返回一个runtime.ObjectTyper（UnstructuredObjectTyper），即一个反映discovery information的unstructred objects
+		可以简单地认为func NewUnstructuredObjectTyper是把入参GVR转化为一个UnstructuredObjectTyper类型
+	*/
 	typer := discovery.NewUnstructuredObjectTyper(groupResources)
+	/*
+		把userResources、mapper、discoveryClient封装成一个ShortcutExpander结构，就是一个简单的封装
+
+		userResources定义在/pkg/kubectl/cmd/util/shortcut_restmapper.go
+			==>userResources是主要的资源名称，用户client tools使用的资源。
+	*/
 	return NewShortcutExpander(mapper, discoveryClient), typer, nil
 }
 ```
@@ -355,6 +388,9 @@ type CachedDiscoveryInterface interface {
 	*/
 	Fresh() bool
 	// Invalidate enforces that no cached data is used in the future that is older than the current time.
+	/*
+		Invalidate()会把client的属性fresh和invalidated都置为true
+	*/	
 	Invalidate()
 }
 ```
@@ -457,7 +493,7 @@ type CachedDiscoveryClient struct {
 	invalidated bool
 	// fresh is true if all used cache files were ours
 	/*
-		fresh=true，如果所使用的cache files是我们的
+		fresh=true，如果所使用的cache files是可以使用的，不需要更新
 	*/
 	fresh bool
 }
@@ -540,7 +576,9 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 	return result, nil
 }
 ```
+
 2. func NewDeferredDiscoveryRESTMapper
+利用discoveryClient获取discovery information，用于执行REST映射，返回一个DeferredDiscoveryRESTMapper
 ```go
 // NewDeferredDiscoveryRESTMapper returns a
 // DeferredDiscoveryRESTMapper that will lazily query the provided
@@ -555,14 +593,29 @@ func NewDeferredDiscoveryRESTMapper(cl CachedDiscoveryInterface, versionInterfac
 		versionInterface: versionInterface,
 	}
 }
+
+// DeferredDiscoveryRESTMapper is a RESTMapper that will defer
+// initialization of the RESTMapper until the first mapping is
+// requested.
+/*
+	译：DeferredDiscoveryRESTMapper是一个RESTMapper，将延迟RESTMapper的初始化，直到请求第一个mapping。
+*/
+type DeferredDiscoveryRESTMapper struct {
+	initMu           sync.Mutex
+	delegate         meta.RESTMapper
+	cl               CachedDiscoveryInterface
+	versionInterface meta.VersionInterfacesFunc
+}
 ```
+
 3. func NewUnstructuredObjectTyper
+可以简单地认为func NewUnstructuredObjectTyper是把入参GVR转化为一个UnstructuredObjectTyper类型
 ```go
 // NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
 // unstructred objects based on discovery information.
 /*
 	func NewUnstructuredObjectTyper 返回一个runtime.ObjectTyper（UnstructuredObjectTyper），
-	反应了discovery information的unstructred objects
+	一个反映discovery information的unstructred objects
 */
 func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *UnstructuredObjectTyper {
 	dot := &UnstructuredObjectTyper{registered: make(map[unversioned.GroupVersionKind]bool)}
@@ -582,3 +635,61 @@ func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *Unstructur
 	return dot
 }
 ```
+看看func NewUnstructuredObjectTyper入参和返回值定义
+```go
+// UnstructuredObjectTyper provides a runtime.ObjectTyper implmentation for
+// runtime.Unstructured object based on discovery information.
+/*
+	译：UnstructuredObjectTyper基于discovery information，
+		为runtime.Unstructured对象提供了一个runtime.ObjectTyper实现。
+*/
+type UnstructuredObjectTyper struct {
+	registered map[unversioned.GroupVersionKind]bool
+}
+
+// APIGroupResources is an API group with a mapping of versions to
+// resources.
+/*
+	type APIGroupResources struct是一个API group，具有版本到资源的映射。
+*/
+type APIGroupResources struct {
+	Group unversioned.APIGroup
+	// A mapping of version string to a slice of APIResources for
+	// that version.
+	/*
+		一个映射关系：
+			version string ==>该version的APIResources
+	*/
+	VersionedResources map[string][]unversioned.APIResource
+}
+```
+
+### NewShortcutExpander
+type ShortcutExpander struct是可以用于Kubernetes资源的RESTMapper。
+把userResources、mapper、discoveryClient封装成一个ShortcutExpander结构，可以理解为就是一个简单的封装
+```go
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) ShortcutExpander {
+	return ShortcutExpander{All: userResources, RESTMapper: delegate, discoveryClient: client}
+}
+
+// userResources are the resource names that apply to the primary, user facing resources used by
+// client tools. They are in deletion-first order - dependent resources should be last.
+/*
+	译：userResources是主要的资源名称，
+		用户client tools使用的资源。
+		他们是删除第一顺序，依赖资源应该是最后的。
+*/
+var userResources = []unversioned.GroupResource{
+	{Group: "", Resource: "pods"},
+	{Group: "", Resource: "replicationcontrollers"},
+	{Group: "", Resource: "services"},
+	{Group: "apps", Resource: "statefulsets"},
+	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
+	{Group: "extensions", Resource: "jobs"},
+	{Group: "extensions", Resource: "deployments"},
+	{Group: "extensions", Resource: "replicasets"},
+}
+```
+
+# 结语
+至此，func (f *factory) UnstructuredObject()函数的介绍已经基本完成

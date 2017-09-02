@@ -467,7 +467,7 @@ type Info struct {
 	tomcat7-psnhd   1/1       Running   0          12s
 	
 	a info's Name is: tomcat7-9r1gx
-	a info's Object ;s type is: *runtime.Unstructured
+	a info's Object 's type is: *runtime.Unstructured
 	a info's Object 's value is: &{map[metadata:map[namespace:default uid:8d06d6cb-8d62-11e7-9c42-080027e58fc6 creationTimestamp:2017-08-30T09:06:47Z labels:map[name:tomcat7] annotations:map[kubernetes.io/created-by:{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ReplicationController","namespace":"default","name":"tomcat7","uid":"8cfa248e-8d62-11e7-9c42-080027e58fc6","apiVersion":"v1","resourceVersion":"8929"}}
 ] ownerReferences:[map[name:tomcat7 uid:8cfa248e-8d62-11e7-9c42-080027e58fc6 controller:true apiVersion:v1 kind:ReplicationController]] name:tomcat7-9r1gx generateName:tomcat7- selfLink:/api/v1/namespaces/default/pods/tomcat7-9r1gx resourceVersion:8947] spec:map[terminationGracePeriodSeconds:30 dnsPolicy:ClusterFirst nodeName:fqhnode securityContext:map[] volumes:[map[hostPath:map[path:/opt/tomcat/conf] name:conf] map[name:webapps hostPath:map[path:/opt/tomcat/webapps]]] containers:[map[terminationMessagePath:/dev/termination-log imagePullPolicy:IfNotPresent name:tomcat7 image:hikdata.io/tomcat:7.0.78 resources:map[] volumeMounts:[map[name:conf mountPath:/opt/tomcat/conf] map[name:webapps mountPath:/opt/tomcat/webapps]]]] restartPolicy:Always] status:map[phase:Running conditions:[map[type:Initialized status:True lastProbeTime:<nil> lastTransitionTime:2017-08-30T09:06:47Z] map[status:True lastProbeTime:<nil> lastTransitionTime:2017-08-30T09:06:49Z type:Ready] map[type:PodScheduled status:True lastProbeTime:<nil> lastTransitionTime:2017-08-30T09:06:47Z]] hostIP:10.0.2.15 podIP:172.17.0.5 startTime:2017-08-30T09:06:47Z containerStatuses:[map[image:hikdata.io/tomcat:7.0.78 imageID:docker://sha256:5055de391846a56ad9b428ed144941cb523bb168154ca2837871ef614fd00077 containerID:docker://c9719d95fe938228b77319d05041e4557349b9857c547662e6fc33316a789d27 name:tomcat7 state:map[running:map[startedAt:2017-08-30T09:06:48Z]] lastState:map[] ready:true restartCount:0]]] kind:Pod apiVersion:v1]}
 	a info's ResourceVersion is: 9419
@@ -483,3 +483,4 @@ type Info struct {
 - type Result struct
 - type Result struct里面的visitor Visitor
 - printer
+我主要以`func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions)`函数的运行过程为主线，对各个概念进行了解。
