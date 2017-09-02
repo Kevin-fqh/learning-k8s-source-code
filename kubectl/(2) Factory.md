@@ -543,7 +543,7 @@ DiscoveryClient通过type RESTClient struct发现server端支持的API groups，
 下面，回到`func (f *factory) UnstructuredObject()`，准备了解定义在/pkg/client/typed/discovery的三大函数func GetAPIGroupResources、func GetAPIGroupResources、func NewUnstructuredObjectTyper
 
 ### 三大函数
-1. func GetAPIGroupResources
+#### func GetAPIGroupResources
 ```go
 // GetAPIGroupResources uses the provided discovery client to gather
 // discovery information and populate a slice of APIGroupResources.
@@ -577,7 +577,7 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 }
 ```
 
-2. func NewDeferredDiscoveryRESTMapper
+#### func NewDeferredDiscoveryRESTMapper
 利用discoveryClient获取discovery information，用于执行REST映射，返回一个DeferredDiscoveryRESTMapper
 ```go
 // NewDeferredDiscoveryRESTMapper returns a
@@ -608,7 +608,7 @@ type DeferredDiscoveryRESTMapper struct {
 }
 ```
 
-3. func NewUnstructuredObjectTyper
+#### func NewUnstructuredObjectTyper
 可以简单地认为func NewUnstructuredObjectTyper是把入参GVR转化为一个UnstructuredObjectTyper类型
 ```go
 // NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
