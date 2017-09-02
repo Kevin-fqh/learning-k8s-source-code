@@ -10,8 +10,7 @@
   - [函数UnstructuredObject](#函数unstructuredobject)
 	- [discoveryClient是个啥](#discoveryclient是个啥)
 	  - [RESTClient](#type-restclient-struct)
-	- [三大函数](#三大函数)
-	- [NewShortcutExpander](#newshortcutexpander)
+	- [四大函数](#四大函数)
   - [结语](#结语)
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -664,7 +663,7 @@ type APIGroupResources struct {
 }
 ```
 
-### NewShortcutExpander
+#### NewShortcutExpander
 type ShortcutExpander struct是可以用于Kubernetes资源的RESTMapper。
 把userResources、mapper、discoveryClient封装成一个ShortcutExpander结构，可以理解为就是一个简单的封装
 ```go
