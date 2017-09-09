@@ -30,8 +30,8 @@
 - 产生info的visitor有：FileVisitor, StreamVisitor, URLVisitor, Selector。
 - 处理info的visitor有：VisitorList, EagerVisitorList, DecoratedVisitor, ContinueOnErrorVisitor, FlattenListVisitor, FilteredVisitor等
 
-Builder中的Do()函数返回一个Result，而Visitor是Result里面最重要的数据结构。  
-那么Visitor的特性是什么？功能是什么？我们从Builder中的Do()函数出发，开始解析。  
+Builder中的Do()函数返回一个Result，而Visitor是Result里面最重要的数据结构。
+那么Visitor的特性是什么？功能是什么？我们从Builder中的Do()函数出发，开始解析。
 可以把func (b *Builder) Do()的主要步骤概括为下面5步:
 ```go
 func (b *Builder) Do() *Result {
@@ -55,7 +55,7 @@ func (b *Builder) Do() *Result {
 
 ## func visitorResult
 Do()的第一行`r := b.visitorResult()`，定义在/pkg/kubectl/resource/builder.go。  
-这里需要注意的一点是对于`kubectl get node`之类的命令而言，虽然`reflect.ValueOf(b.selector)`输出的结果显示为`[]`。  
+这里需要注意的一点是对于`kubectl get node`之类的命令而言，虽然`reflect.ValueOf(b.selector)`输出的结果显示为`[]`。
 但此时`b.selector != nil`的结果为True。
 ```go
 func (b *Builder) visitorResult() *Result {
@@ -166,7 +166,7 @@ func (b *Builder) visitBySelector() *Result {
 	return &Result{visitor: VisitorList(visitors), sources: visitors}
 }
 ```
-进一步查看函数func NewSelector，/pkg/kubectl/resource/selector.go。  
+进一步查看函数func NewSelector，/pkg/kubectl/resource/selector.go。
 根据mapping和namespace等属性生成对应的Selector。
 ```go
 // Selector is a Visitor for resources that match a label selector.
@@ -222,7 +222,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 - 产生info的visitor有：FileVisitor, StreamVisitor, URLVisitor, Selector。
 - 处理info的visitor有：VisitorList, EagerVisitorList, DecoratedVisitor, ContinueOnErrorVisitor, FlattenListVisitor, FilteredVisitor等
 
-其中在FileVisitor、StreamVisitor和URLVisitor在func (b *Builder) FilenameParam中会用到。  
+其中在FileVisitor、StreamVisitor和URLVisitor在func (b *Builder) FilenameParam中会用到。
 URLVisitor、FileVisitor里面都包含了一个StreamVisitor。
 
 ## NewFlattenListVisitor
@@ -281,7 +281,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 ```
 
 ## 设置VisitorFunc
-这里的VisitorFunc就是Visit(fn VisitorFunc)的参数。  
+这里的VisitorFunc就是Visit(fn VisitorFunc)的参数。
 包括四个VisitorFunc：SetNamespace、RequireNamespace、FilterNamespace、RetrieveLazy
 ```go
 // SetNamespace ensures that every Info object visited will have a namespace
@@ -532,10 +532,13 @@ In Visitor2 after fn
 In Visitor1 after fn
 ```
 Daemon里面的嵌套关系为visitor = Visitor3{Visitor2{Visitor1}},
-可以理解为Visitor3.Visitor＝Visitor2，Visitor2.Visitor＝Visitor1 。  
+可以理解为Visitor3.Visitor＝Visitor2，Visitor2.Visitor＝Visitor1 。
+ 
 那么main函数里面的visitor.Visit(fn)首先调用了func (l Visitor3) Visit(fn VisitorFunc)，
-然后嵌套调用了func (l Visitor2) Visit(fn VisitorFunc)，同理推下去即可。  
-外边的Visitor的visitorFunc会嵌入到里边Visitor的fn处。  
+然后嵌套调用了func (l Visitor2) Visit(fn VisitorFunc)，同理推下去即可。
+
+外边的Visitor的visitorFunc会嵌入到里边Visitor的fn处。
+
 main函数visitor.Visit(fn)的调用参考/pkg/kubectl/resource/result.go中的func (r *Result) Infos() ([]*Info, error)中。
 
 ## Daemon-2
