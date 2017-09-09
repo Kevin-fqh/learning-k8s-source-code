@@ -388,6 +388,8 @@ type Visitor interface {
 		如果在list resources的过程中出现问题，入参error将描述出现的问题，该函数可以决定如何处理该错误。
 		无返回表示即使发生错误也接受错误，以继续执行循环。
 		这对于忽略某些类型的错误或以某种方式聚合错误是有用的。
+		
+	VisitorFunc()可以对Info及Error进行处理
 */
 type VisitorFunc func(*Info, error) error
 
@@ -439,7 +441,7 @@ type Info struct {
 ```
 
 其后，查看r := b.visitorResult()，可以看出其返回值是一个type Result struct指针。
-根据前面设置的参数值来选择相应的Visitor
+根据前面设置的参数值（或者说是命令行cmd的参数）来选择相应的Visitor
 ```go
 func (b *Builder) visitorResult() *Result {
 	if len(b.errs) > 0 {
@@ -450,13 +452,36 @@ func (b *Builder) visitorResult() *Result {
 		b.selector = labels.Everything()
 	}
 
+	/*
+		对于kubectl get node 而言，
+		b.selectAll:  false
+		b.selector:  []
+		b.paths:  []
+		b.resourceTuples :  []
+		b.names:  []
+		b.resources:  [nodes]
+
+		对于kubectl get all而言
+		b.selector:  []
+		b.resources:  [pods replicationcontrollers services statefulsets horizontalpodautoscalers jobs deployments replicasets]
+	*/
+	/*
+		根据b *Builder的属性值，生成对应的的Result
+		只要有一个满足，就return
+	*/
 	// visit items specified by paths
 	if len(b.paths) != 0 {
+		/*
+			指定yaml文件路径时走这个，kubectl create -f rc.yaml的时候走这里
+		*/
 		return b.visitByPaths()
 	}
 
 	// visit selectors
 	if b.selector != nil {
+		/*
+			kubectl get node、 kubectl get all、kubectl get pod走这里
+		*/
 		return b.visitBySelector()
 	}
 
@@ -467,6 +492,9 @@ func (b *Builder) visitorResult() *Result {
 
 	// visit items specified by name
 	if len(b.names) != 0 {
+		/*
+			kubectl get pod tomcat7-xmv03 走这里
+		*/
 		return b.visitByName()
 	}
 
@@ -552,7 +580,8 @@ func (b *Builder) visitBySelector() *Result {
 	}
 
 	/*
-		生成visitors
+		针对每一个mapping生成一个type Selector struct（实现了接口Visitor）
+		全部append到切片visitors中
 	*/
 	visitors := []Visitor{}
 	for _, mapping := range mappings {
@@ -564,10 +593,17 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
+		/*
+			NewSelector重点函数
+		*/
 		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
 	}
 	/*
 		生成Result
+		这里有EagerVisitorList(visitors)和VisitorList(visitors)，实现了类型转换
+		其中type EagerVisitorList和type VisitorList 和Visitor 都是实现了Visitor接口的
+
+		一般情况下b.continueOnError会是true
 	*/
 	if b.continueOnError {
 		return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
@@ -622,3 +658,4 @@ Builder的Do()返回一个type Result struct，
 该type Result struct中含有一个visitor Visitor，
 visitor 能访问在Builder中定义的resources。
 最后通过type Result struct的Infos()方法把命令行如`kubectl get po`的结果取出来存储到type Info struct中。
+下一篇文章将对种类繁多的Visitor进行进一步的解析。
