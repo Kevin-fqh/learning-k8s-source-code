@@ -31,7 +31,7 @@
 - 处理info的visitor有：VisitorList, EagerVisitorList, DecoratedVisitor, ContinueOnErrorVisitor, FlattenListVisitor, FilteredVisitor等
 
 Builder中的Do()函数返回一个Result，而Visitor是Result里面最重要的数据结构。  
-那么Visitor的特性是什么？功能是什么？我们从Builder中的Do()函数出发，开始解析。
+那么Visitor的特性是什么？功能是什么？我们从Builder中的Do()函数出发，开始解析。  
 可以把func (b *Builder) Do()的主要步骤概括为下面5步:
 ```go
 func (b *Builder) Do() *Result {
@@ -222,7 +222,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 - 产生info的visitor有：FileVisitor, StreamVisitor, URLVisitor, Selector。
 - 处理info的visitor有：VisitorList, EagerVisitorList, DecoratedVisitor, ContinueOnErrorVisitor, FlattenListVisitor, FilteredVisitor等
 
-其中在FileVisitor、StreamVisitor和URLVisitor在func (b *Builder) FilenameParam中会用到。
+其中在FileVisitor、StreamVisitor和URLVisitor在func (b *Builder) FilenameParam中会用到。  
 URLVisitor、FileVisitor里面都包含了一个StreamVisitor。
 
 ## NewFlattenListVisitor
@@ -256,7 +256,7 @@ func NewFlattenListVisitor(v Visitor, mapper *Mapper) Visitor {
 再看func (v FlattenListVisitor) Visit(fn VisitorFunc)的定义，
 可以发现Visitor interface是层层嵌套的。
 
-一个Visitor(父Visitor)结构体中包含另一个Visitor(子Visitor)。
+一个Visitor(父Visitor)结构体中包含另一个Visitor(子Visitor)。  
 父Visitor中的Visit()方法会调用子Visitor的Visit()方法，并传入一个匿名的visitorFunc，这个匿名的visitorFunc在子Visitor看来就是fn。
 ```go
 func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
@@ -353,7 +353,7 @@ func FilterNamespace(info *Info, err error) error {
 ```
 
 ## NewDecoratedVisitor
-r.visitor = NewDecoratedVisitor(r.visitor, helpers...) 对r.visitor再进行一层封装，把上面的4个helper func封装进去。
+r.visitor = NewDecoratedVisitor(r.visitor, helpers...) 对r.visitor再进行一层封装，把上面的4个helper func封装进去。  
 查看func (v DecoratedVisitor) Visit(fn VisitorFunc)，会发现DecoratedVisitor就是调用了这4个helper func对info进行处理。
 ```go
 // DecoratedVisitor will invoke the decorators in order prior to invoking the visitor function
@@ -454,7 +454,7 @@ type Visitor interface {
 }
 type VisitorFunc func(*Info, error) error
 ```
-只要实现了Visit(VisitorFunc) error方法的结构体都可以称为Visitor。
+只要实现了Visit(VisitorFunc) error方法的结构体都可以称为Visitor。  
 重点了解Visitor的嵌套。可以通过下面的两个Daemon来进一步了解。
 - 如果info已经生成，那么visitor嵌套中的visitor只要处理info即可；
 - 如果还没有info，则最里面的visitor要在fn()调用之前生成info，以供其他visitor处理。
@@ -532,18 +532,15 @@ In Visitor2 after fn
 In Visitor1 after fn
 ```
 Daemon里面的嵌套关系为visitor = Visitor3{Visitor2{Visitor1}},
-可以理解为Visitor3.Visitor＝Visitor2，Visitor2.Visitor＝Visitor1 。
-
-那么main函数里面的visitor.Visit(fn)首先调用了func (l Visitor3) Visit(fn VisitorFunc)，然后嵌套调用了func (l Visitor2) Visit(fn VisitorFunc)，同理推下去即可。
-
-外边的Visitor的visitorFunc会嵌入到里边Visitor的fn处。
-
+可以理解为Visitor3.Visitor＝Visitor2，Visitor2.Visitor＝Visitor1 。  
+那么main函数里面的visitor.Visit(fn)首先调用了func (l Visitor3) Visit(fn VisitorFunc)，
+然后嵌套调用了func (l Visitor2) Visit(fn VisitorFunc)，同理推下去即可。  
+外边的Visitor的visitorFunc会嵌入到里边Visitor的fn处。  
 main函数visitor.Visit(fn)的调用参考/pkg/kubectl/resource/result.go中的func (r *Result) Infos() ([]*Info, error)中。
 
 ## Daemon-2
-在func (b *Builder) visitBySelector()中有个遍历生成`visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))`，其中visitors := []Visitor{}。
-然后回到Do()函数里面，如`r.visitor = NewFlattenListVisitor(r.visitor, b.mapper)`，入参r.visitor正是上面循环遍历中生成的visitors。仿造该过程的Daemon如下所示。
-来看看这种情况下的函数调用关系是如何的？
+在func (b *Builder) visitBySelector()中有个遍历生成`visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))`，其中visitors := []Visitor{}。  
+然后回到Do()函数里面，如`r.visitor = NewFlattenListVisitor(r.visitor, b.mapper)`，入参r.visitor正是上面循环遍历中生成的visitors。仿造该过程的Daemon如下所示。来看看这种情况下的函数调用关系是如何的？
 
 来看Daemon
 ```go
@@ -728,7 +725,7 @@ In Visitor3 after Visit
 - EagerVisitorList、VisitorList都是[]Visitor类型，对info信息或者err进行处理
 - type Info struct, info是用来存储REST请求的返回结果的
 
-如果info已经生成，那么visitor嵌套中的visitor只要处理info即可；
+如果info已经生成，那么visitor嵌套中的visitor只要处理info即可；  
 如果没有info，则最里面的visitor要在fn()调用之前生成info，以供其他visitor处理。
 
 ### StreamVisitor
