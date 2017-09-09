@@ -1133,7 +1133,6 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 ```
 
 ### EagerVisitorList
-type EagerVisitorList []Visitor
 ```go
 // EagerVisitorList implements Visit for the sub visitors it contains. All errors
 // will be captured and returned at the end of iteration.
@@ -1165,7 +1164,6 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 }
 ```
 ### VisitorList
-type VisitorList []Visitor
 ```go
 // VisitorList implements Visit for the sub visitors it contains. The first error
 // returned from a child Visitor will terminate iteration.
@@ -1187,7 +1185,6 @@ func (l VisitorList) Visit(fn VisitorFunc) error {
 ```
 
 ### Info
-type Info struct 
 ```go
 // Info contains temporary info to execute a REST call, or show the results
 // of an already completed REST call.
