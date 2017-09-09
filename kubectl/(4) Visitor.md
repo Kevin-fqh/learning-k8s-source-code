@@ -538,7 +538,7 @@ Daemon里面的嵌套关系为visitor = Visitor3{Visitor2{Visitor1}},
 
 外边的Visitor的visitorFunc会嵌入到里边Visitor的fn处。
 
-main函数visitor.Visit(fn)的调用在k8s源码里面在/pkg/kubectl/resource/result.go中的func (r *Result) Infos() ([]*Info, error)中。
+main函数visitor.Visit(fn)的调用参考/pkg/kubectl/resource/result.go中的func (r *Result) Infos() ([]*Info, error)中。
 
 ## Daemon-2
 在func (b *Builder) visitBySelector()中有个遍历生成`visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))`，其中visitors := []Visitor{}。
