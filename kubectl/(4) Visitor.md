@@ -542,7 +542,7 @@ main函数visitor.Visit(fn)的调用在k8s源码里面在/pkg/kubectl/resource/r
 
 ## Daemon-2
 在func (b *Builder) visitBySelector()中有个遍历生成`visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))`，其中visitors := []Visitor{}。
-然后回到Do()函数里面，如`r.visitor = NewFlattenListVisitor(r.visitor, b.mapper)`，入参r.visitor的类型正是[]Visitor{}。
+然后回到Do()函数里面，如`r.visitor = NewFlattenListVisitor(r.visitor, b.mapper)`，入参r.visitor正是上面循环遍历中生成的visitors。仿造该过程的Daemon如下所示。
 来看看这种情况下的函数调用关系是如何的？
 
 来看Daemon
