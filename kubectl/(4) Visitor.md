@@ -4,14 +4,13 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [func visitorResult](#func-visitorresult)
 	- [func visitBySelector](#func-visitbyselector)
-	- [func visitByName](#func-visitbyname)
   - [NewFlattenListVisitor](#newflattenlistvisitor)
   - [设置VisitorFunc](#设置visitorfunc)
   - [NewDecoratedVisitor](#newdecoratedvisitor)
   - [ContinueOnErrorVisitor](#continueonerrorvisitor)
   - [总结](#总结)
-  - [Daemon-1](#Daemon-1)
-  - [Daemon-2](#Daemon-2)
+  - [Daemon-1](#daemon-1)
+  - [Daemon-2](#daemon-2)
   - [各个Visitor汇总](#各个visitor汇总)
 	- [StreamVisitor](#streamvisitor)
 	- [FileVisitor](#filevisitor)
@@ -19,7 +18,7 @@
 	- [Selector](#selector)
 	- [FilteredVisitor](#filteredvisitor)
 	- [DecoratedVisitor](#decoratedvisitor)
-	- [ContinueOnErrorVisitor](#continueonerrorvisitor)
+	- [ContinueOnErrorVisitor](#type-continueonerrorvisitor-struct)
 	- [FlattenListVisitor](#flattenlistvisitor)
 	- [EagerVisitorList](#eagervisitorlist)
 	- [VisitorList](#visitorlist)
@@ -1017,7 +1016,7 @@ func (v DecoratedVisitor) Visit(fn VisitorFunc) error {
 	})
 }
 ```
-### ContinueOnErrorVisitor  
+### type ContinueOnErrorVisitor struct   
 ```go
 // ContinueOnErrorVisitor visits each item and, if an error occurs on
 // any individual item, returns an aggregate error after all items
