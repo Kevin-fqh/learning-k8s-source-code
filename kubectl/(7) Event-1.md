@@ -1,10 +1,11 @@
-# Event机制
+# Event机制-1
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [流程](#流程)
   - [Event](#event)
-  - [总结](#总结)
+	- [Event的定义](#event的定义)
+	- [InvolvedObject属性和Source属性](#involvedobject属性和source属性)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -238,8 +239,22 @@ type Event struct {
 	// Required. The object that this event is about.
 	// +optional
 	/*
-		InvolvedObject表示的是这个Events所属的资源。它的类型是ObjectReference
-		ObjectReference里包含的信息足够我们唯一确定该资源实例
+		InvolvedObject表示的是这个Events涉及到对象。它的类型是ObjectReference
+				ObjectReference里包含的信息足够我们唯一确定该资源实例
+
+				=>一个Node的Event
+					involvedObject:
+		  				kind: Node
+						name: fqhnode
+						uid: fqhnode
+				=>一个由rc创建的Pod的Event
+					involvedObject:
+						apiVersion: v1
+						kind: ReplicationController
+						name: tomcat7
+						namespace: default
+						resourceVersion: "16437"
+						uid: 3dc60ca7-9788-11e7-ba64-080027e58fc6
 	*/
 	InvolvedObject ObjectReference `json:"involvedObject,omitempty"`
 
@@ -258,7 +273,8 @@ type Event struct {
 	// Optional. The component reporting this event. Should be a short machine understandable string.
 	// +optional
 	/*
-		Source表示的是该Events的来源（eg: Node、Pod、ReplicationController）
+		Source表示的是该Events的来源，eg: replication-controller、kubelet。
+		是哪个k8s组件在哪个host主机上生成的该Event。
 	*/
 	Source EventSource `json:"source,omitempty"`
 
@@ -437,6 +453,7 @@ type ObjectMeta struct {
 LASTSEEN   FIRSTSEEN   COUNT     NAME            KIND                    SUBOBJECT                  TYPE      REASON              SOURCE                      MESSAGE
 3m         3m          1         tomcat7-nnxtd   Pod                     spec.containers{tomcat7}   Normal    Started             {kubelet fqhnode}           Started container with docker id 4ca30b2f9be9
 3m         3m          1         tomcat7         ReplicationController                              Normal    SuccessfulCreate    {replication-controller }   Created pod: tomcat7-nnxtd
+3m         4h          3         fqhnode   Node                  Normal    NodeNotReady            {controllermanager }   Node fqhnode status is now: NodeNotReady
 ```
 再查看`kubectl get events -o yaml`的部分输出
 ```go
@@ -509,9 +526,36 @@ source:
   component: replication-controller
 type: Normal
 ```
+再查看一个
+```
+# kubectl get events fqhnode.14e376a677335278 -o yaml
+
+apiVersion: v1
+count: 4
+firstTimestamp: 2017-09-12T00:45:57Z
+involvedObject:
+  kind: Node
+  name: fqhnode
+  uid: fqhnode
+kind: Event
+lastTimestamp: 2017-09-12T10:24:58Z
+message: 'Node fqhnode status is now: NodeReady'
+metadata:
+  creationTimestamp: 2017-09-12T10:24:58Z
+  name: fqhnode.14e376a677335278
+  namespace: default
+  resourceVersion: "26948"
+  selfLink: /api/v1/namespaces/default/events/fqhnode.14e376a677335278
+  uid: a07d6605-97a4-11e7-ba64-080027e58fc6
+reason: NodeReady
+source:
+  component: kubelet
+  host: fqhnode
+type: Normal
+```
 
 ### InvolvedObject属性和Source属性
-InvolvedObject表示的是这个Events所属的资源。它的类型是ObjectReference。ObjectReference里包含的信息足够我们唯一确定该资源实例。
+InvolvedObject表示的是这个Events涉及到对象。它的类型是ObjectReference。ObjectReference里包含的信息足够我们唯一确定该资源实例。
 ```go
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 /*
@@ -543,7 +587,7 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 ```
-Source表示的是该Events的来源，eg: Node、Pod、ReplicationController
+Source表示的是该Events的来源，eg: replication-controller、kubelet。是哪个k8s组件在哪个host主机上生成的该Event。
 ```go
 type EventSource struct {
 	// Component from which the event is generated.
