@@ -1,6 +1,6 @@
 # sort
 
-简单介绍[package sort](#https://godoc.org/sort)的用法。
+简单介绍[package sort](https://godoc.org/sort)的用法。
 
 对于sliece，目前sort包官方仅仅支持int float64 string三个类型的slice的排序。这对于期望对自定义的数据结构进行排序是不够的。
 
