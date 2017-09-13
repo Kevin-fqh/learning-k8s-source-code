@@ -239,7 +239,7 @@ type Event struct {
 	// Required. The object that this event is about.
 	// +optional
 	/*
-		InvolvedObject表示的是这个Events涉及到对象。它的类型是ObjectReference
+		InvolvedObject表示的是这个Events涉及到资源。它的类型是ObjectReference
 				ObjectReference里包含的信息足够我们唯一确定该资源实例
 
 				=>一个Node的Event
@@ -523,7 +523,7 @@ metadata:
   uid: 0dfa2db7-9795-11e7-ba64-080027e58fc6
 reason: SuccessfulCreate
 source:
-  component: replication-controller
+  component: replication-controller     //这个replication-controller表示的是控制器rc
 type: Normal
 ```
 再查看一个
@@ -555,7 +555,7 @@ type: Normal
 ```
 
 ### InvolvedObject属性和Source属性
-InvolvedObject表示的是这个Events涉及到对象。它的类型是ObjectReference。ObjectReference里包含的信息足够我们唯一确定该资源实例。
+InvolvedObject表示的是这个Events涉及到资源。它的类型是ObjectReference。ObjectReference里包含的信息足够我们唯一确定该资源实例。
 ```go
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 /*
@@ -587,7 +587,24 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 ```
+```
+				=>一个Node的Event
+					involvedObject:
+		  				kind: Node
+						name: fqhnode
+						uid: fqhnode
+				=>一个由rc创建的Pod的Event
+					involvedObject:
+						apiVersion: v1
+						kind: ReplicationController    //这个rc指的是yaml文件声明的kind rc
+						name: tomcat7
+						namespace: default
+						resourceVersion: "16437"
+						uid: 3dc60ca7-9788-11e7-ba64-080027e58fc6
+```
+
 Source表示的是该Events的来源，eg: replication-controller、kubelet。是哪个k8s组件在哪个host主机上生成的该Event。
+这里的replication-controller表示的是控制器rc，不同于上面InvolvedObject属性中所说的。
 ```go
 type EventSource struct {
 	// Component from which the event is generated.
