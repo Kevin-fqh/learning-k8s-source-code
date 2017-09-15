@@ -301,6 +301,9 @@ type Event struct {
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
 // Structures that are versioned or persisted should inline TypeMeta.
+/*
+	定义了该资源的类别和版本，对应yaml文件的kind: Pod和apiVersion: v1
+*/
 type TypeMeta struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
 	/*
@@ -453,7 +456,7 @@ type ObjectMeta struct {
 LASTSEEN   FIRSTSEEN   COUNT     NAME            KIND                    SUBOBJECT                  TYPE      REASON              SOURCE                      MESSAGE
 3m         3m          1         tomcat7-nnxtd   Pod                     spec.containers{tomcat7}   Normal    Started             {kubelet fqhnode}           Started container with docker id 4ca30b2f9be9
 3m         3m          1         tomcat7         ReplicationController                              Normal    SuccessfulCreate    {replication-controller }   Created pod: tomcat7-nnxtd
-3m         4h          3         fqhnode   Node                  Normal    NodeNotReady            {controllermanager }   Node fqhnode status is now: NodeNotReady
+3m         4h          3         fqhnode         Node                  Normal    NodeNotReady            {controllermanager }   Node fqhnode status is now: NodeNotReady
 ```
 再查看`kubectl get events -o yaml`的部分输出
 ```go
@@ -588,19 +591,20 @@ type ObjectReference struct {
 }
 ```
 ```
-				=>一个Node的Event
-					involvedObject:
-		  				kind: Node
-						name: fqhnode
-						uid: fqhnode
-				=>一个由rc创建的Pod的Event
-					involvedObject:
-						apiVersion: v1
-						kind: ReplicationController    //这个rc指的是yaml文件声明的kind rc
-						name: tomcat7
-						namespace: default
-						resourceVersion: "16437"
-						uid: 3dc60ca7-9788-11e7-ba64-080027e58fc6
+=>一个Node的Event
+	involvedObject:
+		kind: Node
+		name: fqhnode
+		uid: fqhnode
+
+=>一个由rc创建的Pod的Event
+	involvedObject:
+		apiVersion: v1
+		kind: ReplicationController    //这个rc指的是yaml文件声明的kind rc
+		name: tomcat7
+		namespace: default
+		resourceVersion: "16437"
+		uid: 3dc60ca7-9788-11e7-ba64-080027e58fc6
 ```
 
 Source表示的是该Events的来源，eg: replication-controller、kubelet。是哪个k8s组件在哪个host主机上生成的该Event。
