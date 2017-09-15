@@ -456,7 +456,7 @@ type ObjectMeta struct {
 LASTSEEN   FIRSTSEEN   COUNT     NAME            KIND                    SUBOBJECT                  TYPE      REASON              SOURCE                      MESSAGE
 3m         3m          1         tomcat7-nnxtd   Pod                     spec.containers{tomcat7}   Normal    Started             {kubelet fqhnode}           Started container with docker id 4ca30b2f9be9
 3m         3m          1         tomcat7         ReplicationController                              Normal    SuccessfulCreate    {replication-controller }   Created pod: tomcat7-nnxtd
-3m         4h          3         fqhnode         Node                  Normal    NodeNotReady            {controllermanager }   Node fqhnode status is now: NodeNotReady
+3m         4h          3         fqhnode         Node                                               Normal    NodeNotReady            {controllermanager }        Node fqhnode status is now: NodeNotReady
 ```
 再查看`kubectl get events -o yaml`的部分输出
 ```go
