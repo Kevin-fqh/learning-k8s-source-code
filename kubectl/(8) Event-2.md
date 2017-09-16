@@ -5,7 +5,7 @@
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [流程](#流程)
+  - [Event生产者](#event生产者)
   - [Event](#event)
 	- [Event的定义](#event的定义)
 	- [InvolvedObject属性和Source属性](#involvedobject属性和source属性)
@@ -68,7 +68,8 @@ type EventBroadcaster interface {
 	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
 	// with the event source set to the given event source.
 	/*
-		返回一个EventRecorder，可以将events发送到EventBroadcaster，事件源设置为给定的事件源。
+		返回一个EventRecorder，可以将events发送到EventBroadcaster，
+		event source设置为入参source api.EventSource。
 	*/
 	NewRecorder(source api.EventSource) EventRecorder
 }
@@ -83,13 +84,18 @@ type eventBroadcasterImpl struct {
 // NewRecorder returns an EventRecorder that records events with the given event source.
 /*
 	NewRecorder返回一个EventRecorder，用于记录与给定事件源的事件。
-	传入的参数是source api.EventSource，就是期望记录的event源
+	传入的参数是source api.EventSource，就是记录的event源
 */
 func (eventBroadcaster *eventBroadcasterImpl) NewRecorder(source api.EventSource) EventRecorder {
 	return &recorderImpl{source, eventBroadcaster.Broadcaster}
 }
 
 // EventRecorder knows how to record events on behalf of an EventSource.
+/*
+	根据EventSource的表现记录相应的event，也就是生成event
+	不管是PastEventf()、Eventf()还是Event()最终都指向了函数func (recorder *recorderImpl) generateEvent。
+	略有区别的地方是Eventf()调用了Sprintf()来输出Events message，PastEventf()可创建指定时间发生的Events。
+*/
 type EventRecorder interface {
 	// Event constructs an event from the given information and puts it in the queue for sending.
 	// 'object' is the object this event is about. Event will make a reference-- or you may also
@@ -142,7 +148,10 @@ type recorderImpl struct {
 		glog.Errorf("Failed to start OOM watching: %v", err)
 	}
 ```
-能看出，这里在启动各种manager失败的时候，生成一个event。关键点找到了。这里就是Event的生产者。查看type recorderImpl struct的Eventf方法
+可以看出，这里在启动各种manager失败的时候，生成一个event。关键点找到了。这里就是Event的生产者,利用recoder生成了一个event。
+在pkg/client/record/event.go，我们查看type recorderImpl struct的Eventf方法，可以发现最后调用的是generateEvent方法。
+
+在generateEvent方法中有两个重要的地方：一方面调用makeEvent方法生成一个Event；另一方面调用了recorder.Action把指定的event分发给所有的watchers。
 ```go
 func (recorder *recorderImpl) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
 	recorder.Event(object, reason, fmt.Sprintf(messageFmt, args...))
@@ -159,10 +168,58 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unv
 		return
 	}
 
+	/*
+		调用makeEvent生成真正的一个event
+	*/
 	event := makeEvent(ref, reason, message)
 	event.Source = recorder.source
 
+	/*
+		把指定的event分发给所有的watchers
+		定义在/pkg/watch/mux.go
+			==>func (m *Broadcaster) Action(action EventType, obj runtime.Object)
+	*/
 	recorder.Action(watch.Added, event)
 }
-```
 
+func makeEvent(ref *api.ObjectReference, reason, message string) *api.Event {
+	//时间戳
+	t := unversioned.Now()
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = api.NamespaceDefault
+	}
+	/*
+		这是最终的生成Event的地方
+		属性值和/pkg/api/types.go中的type Event struct的定义一摸一样
+	*/
+	return &api.Event{
+		ObjectMeta: api.ObjectMeta{
+			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+			Namespace: namespace,
+		},
+		InvolvedObject: *ref,
+		Reason:         reason,
+		Message:        message,
+		FirstTimestamp: t,
+		LastTimestamp:  t,
+		Count:          1,
+	}
+}
+```
+查看recorder *recorderImpl的Action方法，
+```go
+// Action distributes the given event among all watchers.
+/*
+	把指定的event分发给所有的watchers
+*/
+func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
+	m.incoming <- Event{action, obj}
+}
+```
+至此，Event的定义和生产过程都已经说清楚了。我们可以认为拥有EventsRecorder成员的k8s资源都可以产生Events，
+如，负责管理注册、注销等NodeController，会将Node的状态变化信息记录为Events。
+DeploymentController会记录回滚、扩容等的Events。他们都在ControllerManager启动时被初始化并运行。
+与此同时Kubelet除了会记录它本身运行时的Events，比如：无法为Pod挂载卷等，还包含了一系列像docker_manager这样的小单元，它们各司其职，并记录相Events。
+
+## 

@@ -13,7 +13,114 @@
 那么这些Event怎么来的呢？其机制和原理是什么呢？我们就从kubectl describe pod出发，开始研究k8s Event的机制。
 
 ## 流程
-从/pkg/kubectl/describe.go中func (d *PodDescriber) Describe出发。
+从/kubernetes-1.5.2/pkg/kubectl/cmd/describe.go中的func RunDescribe出发
+```go
+for _, info := range infos {
+		mapping := info.ResourceMapping()
+		/*
+			获取对应的describer，定义在/pkg/kubectl/cmd/util/factory.go
+				==>func (f *factory) Describer(mapping *meta.RESTMapping)
+		*/
+		describer, err := f.Describer(mapping)
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+		s, err := describer.Describe(info.Namespace, info.Name, *describerSettings)
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+		if first {
+			first = false
+			fmt.Fprint(out, s)
+		} else {
+			fmt.Fprintf(out, "\n\n%s", s)
+		}
+	}
+```
+来到/pkg/kubectl/cmd/util/factory.go，
+```go
+/*
+	返回一个Describer以显示指定的RESTMapping type或错误。
+*/
+func (f *factory) Describer(mapping *meta.RESTMapping) (kubectl.Describer, error) {
+	mappingVersion := mapping.GroupVersionKind.GroupVersion()
+	if mapping.GroupVersionKind.Group == federation.GroupName {
+		fedClientSet, err := f.clients.FederationClientSetForVersion(&mappingVersion)
+		if err != nil {
+			return nil, err
+		}
+		if mapping.GroupVersionKind.Kind == "Cluster" {
+			return &kubectl.ClusterDescriber{Interface: fedClientSet}, nil
+		}
+	}
+	clientset, err := f.clients.ClientSetForVersion(&mappingVersion)
+	if err != nil {
+		return nil, err
+	}
+	/*
+		/pkg/kubectl/describe.go
+			==>func DescriberFor(kind unversioned.GroupKind, c clientset.Interface) (Describer, bool)
+	*/
+	if describer, ok := kubectl.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
+		return describer, nil
+	}
+	return nil, fmt.Errorf("no description has been implemented for %q", mapping.GroupVersionKind.Kind)
+}
+
+// Describer returns the default describe functions for each of the standard
+// Kubernetes types.
+func DescriberFor(kind unversioned.GroupKind, c clientset.Interface) (Describer, bool) {
+	f, ok := describerMap(c)[kind]
+	return f, ok
+}
+
+/*
+	Kubernetes中只有部分资源可以被describe，可以称为“DescribableResources”，
+	通过一个资源类型(unversioned.GroupKind)和对应描述器(Describer)的Map映射相关联。
+	这些资源有我们常见的Pod、ReplicationController、Service、Node、Deloyment、ReplicaSet等等。
+	注意这些资源里并不包含Events。
+
+	这里就定义一个Map映射关系表
+*/
+func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
+	m := map[unversioned.GroupKind]Describer{
+		api.Kind("Pod"):                   &PodDescriber{c},
+		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
+		api.Kind("Secret"):                &SecretDescriber{c},
+		api.Kind("Service"):               &ServiceDescriber{c},
+		api.Kind("ServiceAccount"):        &ServiceAccountDescriber{c},
+		api.Kind("Node"):                  &NodeDescriber{c},
+		api.Kind("LimitRange"):            &LimitRangeDescriber{c},
+		api.Kind("ResourceQuota"):         &ResourceQuotaDescriber{c},
+		api.Kind("PersistentVolume"):      &PersistentVolumeDescriber{c},
+		api.Kind("PersistentVolumeClaim"): &PersistentVolumeClaimDescriber{c},
+		api.Kind("Namespace"):             &NamespaceDescriber{c},
+		api.Kind("Endpoints"):             &EndpointsDescriber{c},
+		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
+
+		extensions.Kind("ReplicaSet"):                  &ReplicaSetDescriber{c},
+		extensions.Kind("HorizontalPodAutoscaler"):     &HorizontalPodAutoscalerDescriber{c},
+		extensions.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
+		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
+		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
+		extensions.Kind("Deployment"):                  &DeploymentDescriber{c},
+		extensions.Kind("Job"):                         &JobDescriber{c},
+		extensions.Kind("Ingress"):                     &IngressDescriber{c},
+		batch.Kind("Job"):                              &JobDescriber{c},
+		batch.Kind("CronJob"):                          &CronJobDescriber{c},
+		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
+		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
+		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
+		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
+	}
+
+	return m
+}
+```
+
+我们研究describe pod，从/pkg/kubectl/describe.go中func (d *PodDescriber) Describe出发。
 ```go
 type PodDescriber struct {
 	/*
@@ -45,6 +152,10 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 			if describerSettings.ShowEvents && err2 == nil && len(events.Items) > 0 {
 				return tabbedString(func(out io.Writer) error {
 					fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
+					/*
+						这里有个DescribeEvents(events, out)
+						func DescribeEvents(el *api.EventList, w io.Writer)
+					*/
 					DescribeEvents(events, out)
 					return nil
 				})
@@ -92,6 +203,29 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 */
 type DescriberSettings struct {
 	ShowEvents bool
+}
+```
+最后来看看func DescribeEvents
+```go
+func DescribeEvents(el *api.EventList, w io.Writer) {
+	if len(el.Items) == 0 {
+		fmt.Fprint(w, "No events.\n")
+		return
+	}
+	sort.Sort(events.SortableEvents(el.Items))
+	fmt.Fprint(w, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
+	fmt.Fprint(w, "  ---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
+	for _, e := range el.Items {
+		fmt.Fprintf(w, "  %s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
+			translateTimestamp(e.FirstTimestamp),
+			translateTimestamp(e.LastTimestamp),
+			e.Count,
+			e.Source,
+			e.InvolvedObject.FieldPath,
+			e.Type,
+			e.Reason,
+			e.Message)
+	}
 }
 ```
 
@@ -292,8 +426,22 @@ type Event struct {
 
 	// Type of this event (Normal, Warning), new types could be added in the future.
 	// +optional
+	/*
+		Events分为两类，分别是EventTypeNormal和EventTypeWarning，
+		它们分别表示该Events“仅表示信息，不会造成影响”和“可能有些地方不太对”。
+		
+		eg:
+			s.Recorder.Eventf(s.Config.NodeRef, api.EventTypeNormal, "Starting", "Starting kube-proxy.")
+	*/
 	Type string `json:"type,omitempty"`
 }
+
+const (
+	// Information only and will not cause any problems
+	EventTypeNormal string = "Normal"
+	// These events are to warn that something might go wrong
+	EventTypeWarning string = "Warning"
+)
 ```
 可以发现都含有两个属性unversioned.TypeMeta和ObjectMeta。其中type TypeMeta struct定义在/pkg/api/unversioned/types.go。
 这里直接把type ObjectMeta struct贴出来，内容有点多，方便以后直接查找。可以发现type ObjectMeta struct里面有很多属性的属性值。
@@ -558,7 +706,7 @@ type: Normal
 ```
 
 ### InvolvedObject属性和Source属性
-InvolvedObject表示的是这个Events涉及到资源。它的类型是ObjectReference。ObjectReference里包含的信息足够我们唯一确定该资源实例。
+InvolvedObject表示的是这个Events涉及到资源，并不是Event本身。它的类型是ObjectReference。ObjectReference里包含的信息足够我们唯一确定该资源实例。
 ```go
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 /*
