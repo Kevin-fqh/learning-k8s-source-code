@@ -3,6 +3,7 @@
 ## 版本说明
 本文涉及代码是V1.5.2
 
+
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [EventCorrelator](#eventcorrelator)
@@ -98,6 +99,7 @@ func recordToSink(sink EventSink, event *api.Event, eventCorrelator *EventCorrel
 
 ## 总结
 - 对整个Event的定义和应用进行总结如下
+
 Event由Kubernetes的核心组件Kubelet和ControllerManager等产生，用来记录系统一些重要的状态变更。
 ControllerManager里包含了一些小controller，比如deployment_controller，它们拥有EventBroadCaster的对象，负责将采集到的Event进行广播。
 Kubelet包含一些小的manager，比如docker_manager，它们会通过EventRecorder输出各种Event。

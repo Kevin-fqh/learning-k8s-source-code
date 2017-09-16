@@ -2,6 +2,8 @@
 
 ## 版本说明
 本文涉及代码是V1.5.2，由于个人原因，Event机制的源码走读会是V1.5.2和V1.1.2的混合。
+
+
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [流程](#流程)
