@@ -288,7 +288,8 @@ type Broadcaster struct {
 
 查看其最后的loop操作，channel incoming的消费者，这就和前面channel income的生产者对应上了。
 
-在func (m *Broadcaster) distribute中可以看到是把event填进了watcher的channel result中，这就和本文最开始中提到的eventBroadcaster.StartRecordingToSink和eventBroadcaster.StartLogging(glog.V(3).Infof)的消费watcher 的channel result对应上了。
+在func (m *Broadcaster) distribute中可以看到是把event填进了watcher的channel result中。
+这会和下面介绍的[EventWatcher](#eventwatcher)中提到的eventBroadcaster.StartRecordingToSink和eventBroadcaster.StartLogging(glog.V(3).Infof)的消费watcher 的channel result对应上了。
 ```go
 // loop receives from m.incoming and distributes to all watchers.
 /*
