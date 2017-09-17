@@ -78,6 +78,12 @@ type EventBroadcaster interface {
 
 /*
 	type eventBroadcasterImpl struct 实现了type EventBroadcaster interface
+
+	Broadcaster 就是广播的意思，主要功能就是把发给它的消息，广播给所有的监听者（watcher）。
+	它的实现代码在 pkg/watch/mux.go
+	watch.Broadcaster 是一个分发器，内部保存了一个消息队列，可以通过 Watch 创建监听它内部的 worker。
+	当有消息发送到队列中，watch.Broadcaster 后台运行的 goroutine 会接收消息并发送给所有的 watcher。
+	而每个 watcher 都有一个接收消息的 channel，用户可以通过它的 ResultChan() 获取这个 channel 从中读取数据进行处理。
 */
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
@@ -335,6 +341,11 @@ func (m *Broadcaster) distribute(event Event) {
 ### EventWatcher
 至此，基本思路已经清晰。那么还有一个问题就是event的watcher是怎么来？在哪里向eventBroadcaster注册的？
 
+eventBroadcaster通过 EventRecorder 提供接口供用户写事件，内部把接收到的事件发送给处理函数。
+处理函数是可以扩展的，用户可以通过 StartEventWatcher 来编写自己的事件处理逻辑，
+kubelet 默认会使用 StartRecordingToSink 和 StartLogging，
+也就是说任何一个事件会同时发送给 apiserver，并打印到日志中。
+
 我们还是从/cmd/kubelet/app/server.go，func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) 出发，
 ```go
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
@@ -471,7 +482,11 @@ func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler fun
 			==>func (m *Broadcaster) Watch()
 	*/
 	watcher := eventBroadcaster.Watch()
-	//启动一个goroutine用来监视Broadcaster发来的Events
+	/*
+		监视Broadcaster发来的Events
+		启动一个 goroutine，不断从 watcher.ResultChan() 中读取消息，
+		然后调用 eventHandler(event) 对事件进行处理。
+	*/
 	go func() {
 		defer util.HandleCrash()
 		for {

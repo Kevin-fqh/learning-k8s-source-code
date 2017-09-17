@@ -401,6 +401,9 @@ type Event struct {
 	// can't start, the Reason might be "ImageNotFound".
 	// TODO: provide exact specification for format.
 	// +optional
+	/*
+		事件产生的原因，可以在 pkg/kubelet/events/event.go 看到 kubelet 定义的所有事件类型
+	*/
 	Reason string `json:"reason,omitempty"`
 
 	// Optional. A human-readable description of the status of this operation.
@@ -426,6 +429,9 @@ type Event struct {
 
 	// The number of times this event has occurred.
 	// +optional
+	/*
+		数量（kubernetes 会把多个相同的事件汇聚到一起）
+	*/
 	Count int32 `json:"count,omitempty"`
 
 	// Type of this event (Normal, Warning), new types could be added in the future.
