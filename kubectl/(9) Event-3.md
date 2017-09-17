@@ -75,6 +75,7 @@ aggregator和logger都会在内部维护一个缓存（默认长度是 4096)，
 这也是/pkg/client/record/events_cache.go的文件名带有cache的原因。
 
 Kubernetes的Events可以按照两种方式分类：相同和相似。
+
 相同指的是两个Events除了时间戳以外的其他信息均相同。
 
 相似指的是两个Events除了时间戳和消息(message)以外的其他信息均相同。
