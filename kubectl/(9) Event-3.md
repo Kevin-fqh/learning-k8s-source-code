@@ -7,6 +7,8 @@
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [EventCorrelator](#eventcorrelator)
+  - [event handler函数recordToSink](#event-handler函数recordtosink)
+  - [eventCorrelator的EventCorrelate函数](#eventcorrelator的eventcorrelate函数)
   - [总结](#总结)
 <!-- END MUNGE: GENERATED_TOC -->
 
