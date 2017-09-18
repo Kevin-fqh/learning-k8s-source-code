@@ -398,7 +398,7 @@ func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingE
 ```
 
 ## eventCorrelator的EventCorrelate函数
-前面提到eventCorrelator.EventCorrelate会对event进行预处理
+前面提到eventCorrelator.EventCorrelate会对event进行预处理, /pkg/client/record/events_cache.go
 ```go
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events
 /*
