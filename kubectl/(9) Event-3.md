@@ -402,7 +402,7 @@ func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingE
 ```
 
 ## eventCorrelator的EventCorrelate函数
-前面提到eventCorrelator.EventCorrelate会对event进行预处理, /pkg/client/record/events_cache.go。可以发现，aggregator先进行聚合操作，然后logger对aggregateEvent进行去重操作。
+前面提到eventCorrelator.EventCorrelate会对event进行预处理, /pkg/client/record/events_cache.go。可以发现，aggregator先进行聚合操作，然后logger对aggregateEvent进行去重操作。预处理后返回的事件可能是原来的事件，也可能是新创建的事件。
 ```go
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events
 /*
@@ -483,11 +483,19 @@ watcher由StartEventWatcher()实例产生，并被塞入EventBroadcaster的watch
 watcher通过recordEvent()方法将Event写入对应的EventSink里，最大重试次数为12次，重试间隔随机生成。
 
 在写入EventSink前，会对所有的Events进行聚合等操作。
-将Events分为相同和相似两类，分别使用EventLogger和EventAggregator进行操作。
-EventLogger将相同的Event去重为1个，并通过计数表示它出现的次数。
+将Events分为相似和相同两类，分别使用EventAggregator和EventLogger进行操作。
 EventAggregator将对10分钟内出现10次的Event进行分组，依据是Event的Source、InvolvedObject、Type和Reason域。
+EventLogger将相同的Event去重为1个，并通过计数表示它出现的次数。
 这样可以避免系统长时间运行时产生的大量Event冲击etcd，或占用大量内存。
 EventAggregator和EventLogger采用大小为4096的LRU Cache，存放先前已产生的不重复Events。超出Cache范围的Events会被压缩。
 
+最后通过restclient(eventClient）调用对应的方法，给apiserver发送请求，这个过程如果出错会进行重试。Apiserver接收到事件的请求把数据更新到etcd。
+
+
+Event 和 kubernetes 中其他的资源不同，它有一个很重要的特性就是它可以丢失。如果某个事件丢了，并不会影响集群的正常工作。事件的重要性远低于集群的稳定性，所以我们看到事件整个流程中如果有错误，会直接忽略这个事件。
+
+事件的另外一个特性是它的数量很多，相比于 pod 或者 deployment 等资源，事件要比它们多很多，而且每次有事件都要对 etcd 进行写操作。整个集群如果不加管理地往 etcd 中写事件，会对 etcd 造成很大的压力，而 etcd 的可用性是整个集群的基础，所以每个组件在写事件之前，会对事件进行汇聚和去重工作，减少最终的写操作。
+
 ### 参考
 [K8s Events之捉妖记](https://www.kubernetes.org.cn/1195.html)
+[kubelet源码分析：事件处理](http://cizixs.com/2017/06/22/kubelet-source-code-analysis-part4-event)
