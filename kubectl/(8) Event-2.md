@@ -233,6 +233,9 @@ DeploymentController会记录回滚、扩容等的Events。他们都在Controlle
 ## EventBroadcaster和Broadcaster
 在上面提到了EventBroadcaster有四种方式输出日志。分别是 处理函数handler、EventSink, watcher, or log。
 这个EventBroadcaster实际上是调用定义在 /pkg/watch/mux.go中的func NewBroadcaster方法生成的。
+
+Broadcaster 就是广播的意思，主要功能就是把发给它的消息，广播给所有的监听者（watcher）。
+
 EventBroadcaster是type Broadcaster struct的一种实现，查看其定义
 ```go
 // NewBroadcaster creates a new Broadcaster. queueLength is the maximum number of events to queue per watcher.
@@ -341,7 +344,7 @@ func (m *Broadcaster) distribute(event Event) {
 ### EventWatcher
 至此，基本思路已经清晰。那么还有一个问题就是event的watcher是怎么来？在哪里向eventBroadcaster注册的？
 
-eventBroadcaster通过 EventRecorder 提供接口供用户写事件，内部把接收到的事件发送给处理函数。
+EventBroadcaster是个事件广播器，通过 EventRecorder 提供接口，用户可以往Recoder对象里面发送事件，内部把接收到的事件发送给处理函数。
 处理函数是可以扩展的，用户可以通过 StartEventWatcher 来编写自己的事件处理逻辑，
 kubelet 默认会使用 StartRecordingToSink 和 StartLogging，
 也就是说任何一个事件会同时发送给 apiserver，并打印到日志中。
@@ -382,6 +385,7 @@ kubelet 默认会使用 StartRecordingToSink 和 StartLogging，
 		glog.Warning("No api server defined - no events will be sent to API server.")
 	}
 ```
+StartLogging 和 StartRecordingToSink 创建了两个不同的事件处理函数，分别把事件记录到日志和发送给apiserver。
 查看StartLogging和StartRecordingToSink的定义
 ```go
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.

@@ -68,6 +68,10 @@ EventCorrelator定义包含了三个成员，分别是
 EventCorrelator负责处理收到的所有Events，并执行聚合等操作以防止大量的Events冲垮整个系统。
 EventCorrelator会过滤频繁发生的相似Events来防止系统向用户发送难以区分的信息和执行去重操作，以使相同的Events被压缩为被多次计数单个Event。
 
+EventCorrelator检查每个接收到的Event，并让每个子组件可以访问和修改这个Event。
+首先EventAggregator对每个Event进行聚合操作，它基于aggregateKey将Events进行分组，组内区分的唯一标识是localKey。
+然后EventLogger会把相同的Event（除了时间戳之外其他字段都相同）变成同一个Event。
+
 aggregator和logger都会在内部维护一个缓存（默认长度是 4096)，
 事件的相似性和相同性比较是和缓存中的事件进行的，
 也就是说它并不在乎kubelet启动之前的事件。
@@ -398,7 +402,7 @@ func recordEvent(sink EventSink, event *api.Event, patch []byte, updateExistingE
 ```
 
 ## eventCorrelator的EventCorrelate函数
-前面提到eventCorrelator.EventCorrelate会对event进行预处理, /pkg/client/record/events_cache.go
+前面提到eventCorrelator.EventCorrelate会对event进行预处理, /pkg/client/record/events_cache.go。可以发现，aggregator先进行聚合操作，然后logger对aggregateEvent进行去重操作。
 ```go
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events
 /*
@@ -417,10 +421,46 @@ func (c *EventCorrelator) EventCorrelate(newEvent *api.Event) (*EventCorrelateRe
 	observedEvent, patch, err := c.logger.eventObserve(aggregateEvent)
 	return &EventCorrelateResult{Event: observedEvent, Patch: patch}, err
 }
+
+// EventAggregate identifies similar events and groups into a common event if required
+/*
+	func (e *EventAggregator) EventAggregate负责识别类似的events，在有需要的情况下进行分组
+*/
+func (e *EventAggregator) EventAggregate(newEvent *api.Event) (*api.Event, error)
+
+
+// eventObserve records the event, and determines if its frequency should update
+/*
+	计算event的频率
+*/
+func (e *eventLogger) eventObserve(newEvent *api.Event) (*api.Event, []byte, error)
+```
+在Cache里的Key是Event对象除去Timestamp/Counts等剩余部分构成的。下面的任意组合都可以唯一构造Cache里Event唯一的Key：
+```
+event.Source.Component
+event.Source.Host
+event.InvolvedObject.Kind
+event.InvolvedObject.Namespace
+event.InvolvedObject.Name
+event.InvolvedObject.UID
+event.InvolvedObject.APIVersion
+event.Reason
+event.Message
 ```
 
+不管对于EventAggregator或EventLogger，LRU Cache大小仅为4096。
+这也意味着当一个组件（比如Kubelet）运行很长时间，并且产生了大量的不重复Event，
+先前产生的未被检查的Events并不会让Cache大小继续增长，而是将最老的Event从Cache中排除。
+
+当一个Event被产生，先前产生的Event Cache会被检查:  
+- 如果新产生的Event的Key跟先前产生的Event的Key相匹配（意味着前面所有的域都相匹配），那么它被认为是重复的，并且在etcd里已存在的这条记录将被更新。使用PUT方法来更新etcd里存放的这条记录，仅更新它的LastTimestamp和Count域。同时还会更新先前生成的Event Cache里对应记录的Count、LastTimestamp、Name以及新的ResourceVersion。
+
+- 如果新产生的Event的Key并不能跟先前产生的Event相匹配（意味着前面所有的域都不匹配），这个Event将被认为是新的且是唯一的记录，并写入etcd里。使用POST方法来在etcd里创建该记录。对该Event的记录同样被加入到先前生成的Event Cache里。
+
+当然这样还存在一些问题。对于每个组件来说，Event历史都存放在内存里，如果该程序重启，那么历史将被清空。另外，如果产生了大量的唯一Event，旧的Event将从Cache里去除。只有从Cache里去除的Event才会被压缩，同时任何一个此Event的新实例都会在etcd里创建新记录。
+
 ## 总结
-- 对整个Event的定义和应用进行总结如下
+- 对整个Event的定义和应用进行总结如下：
 
 Event由Kubernetes的核心组件Kubelet和ControllerManager等产生，用来记录系统一些重要的状态变更。
 ControllerManager里包含了一些小controller，比如deployment_controller，它们拥有EventBroadCaster的对象，负责将采集到的Event进行广播。
