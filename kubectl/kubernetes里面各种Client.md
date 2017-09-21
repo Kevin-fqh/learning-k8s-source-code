@@ -4,7 +4,7 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [定义](#定义)
   - [用法](#用法)
-    - [基于Clientset生成eventClient、podClient](#基于clientset生成eventclient、podclient)
+    - [基于Clientset生成eventClient、podClient](#基于clientset生成eventclient)
 	- [使用RESTClient](#使用restclient)
 	- [使用DynamicClient](#使用dynamicclient)
   - [总结](#总结)
@@ -96,8 +96,8 @@ RESTClient是Kubernetes最基础的Client，封装了一个http client。下面�
 
 ```
 
-### 基于Clientset生成eventClient、podClient
-我们可以基于type Clientset struct获取如pod、event这些对象，在kubernetes一般的用法是
+### 基于Clientset生成eventClient
+我们可以基于type Clientset struct获取如pod、event这些对象(eventClient、podClient)，在kubernetes一般的用法是
 
 - /cmd/kubelet/app/server.go中的基于config文件生成一个eventClient
 ```go
@@ -170,6 +170,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 ```
 
 - [client-go](https://github.com/kubernetes/client-go/tree/release-2.0)中的用法
+
 k8s V1.5.2对应的client-go版本是v2.0
 ```go
 import (
