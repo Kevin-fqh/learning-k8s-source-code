@@ -157,7 +157,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 }
 ```
 
-下面的Demo就描述如何生成一个RESTClient，并用该RESTClient获取某具体rc的详细信息。
+下面的`Demo`就描述如何生成一个RESTClient，并用该RESTClient获取某具体rc的详细信息。
 ```go
 package main
 import (
@@ -269,7 +269,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 }
 ```
 
-- [client-go](https://github.com/kubernetes/client-go/tree/release-2.0)中的用法  
+- [client-go](https://github.com/kubernetes/client-go/tree/release-2.0)中的`Demo`  
 k8s V1.5.2对应的client-go版本是v2.0
 ```go
 package main
@@ -392,7 +392,7 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 //后面就靠ResourceClient了
 ```
 
-下面的Demo就描述如何使用dynamicClient
+下面的`Demo`就描述如何使用dynamicClient
 ```go
 
 ```
