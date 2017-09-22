@@ -4,7 +4,7 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [定义](#定义)
   - [用法](#用法)
-    - [基于Clientset生成eventClient、podClient](#基于clientset生成eventclient)
+    - [基于Clientset生成eventClient](#基于clientset生成eventclient)
 	- [使用RESTClient](#使用restclient)
 	- [使用DynamicClient](#使用dynamicclient)
   - [总结](#总结)
@@ -91,15 +91,115 @@ type RESTClient struct {
 ```
 ## 用法
 ### 使用RESTClient
-RESTClient是Kubernetes最基础的Client，封装了一个http client。下面的Demo就描述如何生成一个RESTClient，并用该RESTClient获取某具体Pod的详细信息。
-```go
+RESTClient是Kubernetes最基础的Client，封装了一个http client。
 
+参考`/client-go-2.0.0/kubernetes/typed/core/v1/replicationcontroller.go`中的例子，直接使用RESTClient来操作资源
+```go
+// replicationControllers implements ReplicationControllerInterface
+type replicationControllers struct {
+	client rest.Interface //一个RESTClient
+	ns     string
+}
+
+// Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
+func (c *replicationControllers) Get(name string) (result *v1.ReplicationController, err error) {
+	result = &v1.ReplicationController{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(name).
+		Do().
+		Into(result)
+	return
+}
+```
+生成RESTClient参考`/client-go-2.0.0/rest/config.go`
+```go
+// RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
+// object. Note that a RESTClient may require fields that are optional when initializing a Client.
+// A RESTClient created by this method is generic - it expects to operate on an API that follows
+// the Kubernetes conventions, but may not be the Kubernetes API.
+func RESTClientFor(config *Config) (*RESTClient, error) {
+	if config.GroupVersion == nil {
+		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
+	}
+	if config.NegotiatedSerializer == nil {
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
+	}
+	qps := config.QPS
+	if config.QPS == 0.0 {
+		qps = DefaultQPS
+	}
+	burst := config.Burst
+	if config.Burst == 0 {
+		burst = DefaultBurst
+	}
+
+	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	transport, err := TransportFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	var httpClient *http.Client
+	if transport != http.DefaultTransport {
+		httpClient = &http.Client{Transport: transport}
+		if config.Timeout > 0 {
+			httpClient.Timeout = config.Timeout
+		}
+	}
+
+	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+}
+```
+
+下面的Demo就描述如何生成一个RESTClient，并用该RESTClient获取某具体rc的详细信息。
+```go
+package main
+import (
+        "flag"
+        "fmt"
+        "k8s.io/client-go/pkg/runtime"
+        "k8s.io/client-go/pkg/runtime/serializer"
+        "k8s.io/client-go/pkg/api"
+        v1 "k8s.io/client-go/pkg/api/v1"
+        "k8s.io/client-go/pkg/api/unversioned"
+        "k8s.io/client-go/rest"
+        "k8s.io/client-go/tools/clientcmd"
+)
+func main() {
+        kubeconfig := flag.String("kubeconfig", "/home/fqhtool/bin/config", "Path to a kube config. Only required if out-of-cluster.")
+        flag.Parse()
+        config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+        if err != nil {
+                fmt.Println("BuildConfigFromFlags error")
+        }
+        groupversion := &unversioned.GroupVersion{"", "v1"}
+        config.GroupVersion = groupversion
+        config.APIPath = "/api"
+        config.ContentType = runtime.ContentTypeJSON
+        config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+        restClient, err := rest.RESTClientFor(config)
+        if err != nil {
+                fmt.Println("RESTClientFor error")
+        }
+        rc := v1.ReplicationController{}
+        err = restClient.Get().Resource("replicationcontrollers").Namespace("default").Name("registry").Do().Into(&rc)
+        if err != nil {
+                fmt.Println("error")
+        }
+        fmt.Println(rc)
+}
 ```
 
 ### 基于Clientset生成eventClient
 我们可以基于type Clientset struct获取如pod、event这些对象(eventClient、podClient)，在kubernetes一般的用法是
 
-- /cmd/kubelet/app/server.go中的基于config文件生成一个eventClient
+- /cmd/kubelet/app/server.go中直接基于config文件生成一个eventClient
 ```go
 /*
 	/pkg/client/clientset_generated/internalclientset/clientset.go
@@ -169,51 +269,130 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 }
 ```
 
-- [client-go](https://github.com/kubernetes/client-go/tree/release-2.0)中的用法
-
+- [client-go](https://github.com/kubernetes/client-go/tree/release-2.0)中的用法  
 k8s V1.5.2对应的client-go版本是v2.0
 ```go
+package main
 import (
-	"flag"
-	"fmt"
-	"time"
+        "flag"
+        "fmt"
+        "time"
 
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/tools/clientcmd"
+        "k8s.io/client-go/kubernetes"
+        "k8s.io/client-go/pkg/api/v1"
+        "k8s.io/client-go/tools/clientcmd"
 )
 
 var (
-	kubeconfig = flag.String("kubeconfig", "./config", "absolute path to the kubeconfig file")
+        kubeconfig = flag.String("kubeconfig", "/home/fqhtool/bin/config", "absolute path to the kubeconfig file")
 )
 
 func main() {
-	flag.Parse()
-	// uses the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		panic(err.Error())
-	}
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
-	for {
-		//创建一个podClient
-		pods, err := clientset.Core().Pods("").List(v1.ListOptions{})
-		if err != nil {
-			panic(err.Error())
-		}
-		fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
-		time.Sleep(10 * time.Second)
-	}
+        flag.Parse()
+        // uses the current context in kubeconfig
+        config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+        if err != nil {
+                panic(err.Error())
+        }
+        // creates the clientset
+        clientset, err := kubernetes.NewForConfig(config)
+        if err != nil {
+                panic(err.Error())
+        }
+        for {
+                //创建一个podClient
+                pods, err := clientset.Core().Pods("").List(v1.ListOptions{})
+                if err != nil {
+                        panic(err.Error())
+                }
+                fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
+                time.Sleep(10 * time.Second)
+        }
 }
 ```
 
 ### 使用DynamicClient
 `client-go`除了提供clientset的连接方式，还提供了dynamic client 和restful api的连接方式与apiserver交互。
 通过dynamic client可以访问所有资源（包括thirdpartresource所能提供的资源）
+
+dynamicClient的生成方式参考`/client-go-2.0.0/dynamic/client_pool.go`
+```go
+// ClientForGroupVersion returns a client for the specified groupVersion, creates one if none exists. Kind
+// in the GroupVersionKind may be empty.
+func (c *clientPoolImpl) ClientForGroupVersionKind(kind unversioned.GroupVersionKind) (*Client, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	gv := kind.GroupVersion()
+
+	// do we have a client already configured?
+	if existingClient, found := c.clients[gv]; found {
+		return existingClient, nil
+	}
+
+	// avoid changing the original config
+	confCopy := *c.config
+	conf := &confCopy
+
+	// we need to set the api path based on group version, if no group, default to legacy path
+	conf.APIPath = c.apiPathResolverFunc(kind)
+
+	// we need to make a client
+	conf.GroupVersion = &gv
+
+	/*
+		调用func NewClient生成dynamicClient
+	*/
+	dynamicClient, err := NewClient(conf)
+	if err != nil {
+		return nil, err
+	}
+	c.clients[gv] = dynamicClient
+	return dynamicClient, nil
+}
+
+// NewClient returns a new client based on the passed in config. The
+// codec is ignored, as the dynamic client uses it's own codec.
+func NewClient(conf *rest.Config) (*Client, error) {
+	// avoid changing the original config
+	confCopy := *conf
+	conf = &confCopy
+
+	contentConfig := ContentConfig()
+	contentConfig.GroupVersion = conf.GroupVersion
+	if conf.NegotiatedSerializer != nil {
+		contentConfig.NegotiatedSerializer = conf.NegotiatedSerializer
+	}
+	conf.ContentConfig = contentConfig
+
+	if conf.APIPath == "" {
+		conf.APIPath = "/api"
+	}
+
+	if len(conf.UserAgent) == 0 {
+		conf.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
+	cl, err := rest.RESTClientFor(conf)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{cl: cl}, nil
+}
+
+func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
+	return &ResourceClient{
+		cl:             c.cl,
+		resource:       resource,
+		ns:             namespace,
+		parameterCodec: c.parameterCodec,
+	}
+}
+//后面就靠ResourceClient了
+```
+
+下面的Demo就描述如何使用dynamicClient
 ```go
 
 ```
