@@ -7,7 +7,7 @@
     - [基于Clientset生成eventClient](#基于clientset生成eventclient)
 	- [使用RESTClient](#使用restclient)
 	- [使用DynamicClient](#使用dynamicclient)
-  - 使用Clientset创建一个rc
+  - [使用Clientset创建一个rc](#使用clientset创建一个rc)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -479,7 +479,9 @@ func main() {
 ```
 
 ## 使用Clientset创建一个rc
+```go
 
+```
 
 ## 总结
 RESTClient是Kubernetes最基础的Client，封装了一个http client。
