@@ -7,6 +7,7 @@
     - [基于Clientset生成eventClient](#基于clientset生成eventclient)
 	- [使用RESTClient](#使用restclient)
 	- [使用DynamicClient](#使用dynamicclient)
+  - 使用Clientset创建一个rc
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -390,12 +391,95 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 	}
 }
 //后面就靠ResourceClient的接口了
+// ResourceClient is an API interface to a specific resource under a
+// dynamic client.
+type ResourceClient struct {
+	cl             *rest.RESTClient
+	resource       *unversioned.APIResource
+	ns             string
+	parameterCodec runtime.ParameterCodec
+}
 ```
 
 下面的`Demo`就描述如何使用dynamicClient
 ```go
+package main
 
+import (
+	"flag"
+	"fmt"
+	"reflect"
+
+	"encoding/json"
+
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/clientcmd"
+)
+
+func main() {
+	var kubeconfig = flag.String("kubeconfig", "/home/fqhtool/bin/config", "the abs path to the kubeconfig")
+	flag.Parse()
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		fmt.Println("build config error.", err)
+		return
+	}
+	
+	//build dynamicClient error GroupVersion is required when initializing a RESTClient
+	config.GroupVersion = &unversioned.GroupVersion{Group: "", Version: "v1"}
+	dynamicClient, err := dynamic.NewClient(config)
+	if err != nil {
+		fmt.Println("build dynamicClient error.", err)
+		return
+	}
+
+	fmt.Println("获取node资源，非namespace资源")
+	reousrce := unversioned.APIResource{
+		Name:       "nodes", //复数
+		Namespaced: false,
+		Kind:       "Node",
+	}
+	obj, err := dynamicClient.Resource(&reousrce, "").List(&v1.ListOptions{})
+	if err != nil {
+		fmt.Println("list node error.", err)
+		return
+	}
+	js, err := json.Marshal(reflect.ValueOf(obj).Elem().Interface())
+	if err != nil {
+		fmt.Println("Marshal error.", err)
+		return
+	}
+	nodelist := v1.NodeList{}
+	json.Unmarshal(js, &nodelist)
+	fmt.Println(nodelist)
+
+	fmt.Println("获取pod资源，namespace资源")
+	reousrce = unversioned.APIResource{
+		Name:       "pods",
+		Namespaced: true,
+		Kind:       "Pod",
+	}
+	obj, err = dynamicClient.Resource(&reousrce, "").List(&v1.ListOptions{})
+	if err != nil {
+		fmt.Println("list node error.", err)
+		return
+	}
+	js, err = json.Marshal(reflect.ValueOf(obj).Elem().Interface())
+	if err != nil {
+		fmt.Println("Marshal error.", err)
+		return
+	}
+	podlist := v1.PodList{}
+	json.Unmarshal(js, &podlist)
+	fmt.Println(podlist)
+
+}
 ```
+
+## 使用Clientset创建一个rc
+
 
 ## 总结
 RESTClient是Kubernetes最基础的Client，封装了一个http client。
