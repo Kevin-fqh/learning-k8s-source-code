@@ -389,7 +389,7 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 		parameterCodec: c.parameterCodec,
 	}
 }
-//后面就靠ResourceClient了
+//后面就靠ResourceClient的接口了
 ```
 
 下面的`Demo`就描述如何使用dynamicClient
@@ -401,10 +401,20 @@ func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *
 RESTClient是Kubernetes最基础的Client，封装了一个http client。
 restclient 是dynamic client和clientset的基础，支持json与protobuf，可以访问所有资源，实现对自定义thirdpartresource资源的获取。
 
+clientset的用法比较简单，而且也是k8s里面用得最多的。
+
 client-go除了提供clientset的连接方式，还提供了dynamic client 和restful api的连接方式与apiserver交互。
 通过dynamic client可以访问所有资源（包括thirdpartresource所能提供的资源）。
 
 同时可以通过Clientset生成各种资源的Client，进行相关操作。
+
+最后可以通过学习client-go这个包，能更简易地对k8s的内部机制进行了解。
+
+
+## 参考
+[使用client-go进行k8s相关操作](http://blog.csdn.net/yevvzi/article/details/54380944)
+
+
 
 
 
