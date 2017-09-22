@@ -427,7 +427,7 @@ func main() {
 		return
 	}
 	
-	//build dynamicClient error GroupVersion is required when initializing a RESTClient
+	//GroupVersion is required when initializing a RESTClient
 	config.GroupVersion = &unversioned.GroupVersion{Group: "", Version: "v1"}
 	dynamicClient, err := dynamic.NewClient(config)
 	if err != nil {
