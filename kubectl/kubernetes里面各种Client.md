@@ -421,6 +421,7 @@ import (
 func main() {
 	var kubeconfig = flag.String("kubeconfig", "/home/fqhtool/bin/config", "the abs path to the kubeconfig")
 	flag.Parse()
+	//第一个参数masterUrl填""即可，将会使用config文件中的server
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		fmt.Println("build config error.", err)
