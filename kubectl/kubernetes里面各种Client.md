@@ -4,8 +4,8 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [定义](#定义)
   - [用法](#用法)
-    - [基于Clientset生成eventClient](#基于clientset生成eventclient)
 	- [使用RESTClient](#使用restclient)
+	- [基于Clientset生成eventClient](#基于clientset生成eventclient)
 	- [使用DynamicClient](#使用dynamicclient)
   - [使用Clientset创建一个rc](#使用clientset创建一个rc)
   - [总结](#总结)
