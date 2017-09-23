@@ -44,4 +44,4 @@ k8s代为完成了原本需要人们自己操作的重复性的工作，使人�
 提高效率，才是真正的目标。
 
 ## copy自
-[浅谈kubernetes、微服务](#http://www.lijiaocn.com/%E8%A7%81%E8%A7%A3/2017/08/08/talk-micro-service.html)
+[浅谈kubernetes、微服务](http://www.lijiaocn.com/%E8%A7%81%E8%A7%A3/2017/08/08/talk-micro-service.html)
