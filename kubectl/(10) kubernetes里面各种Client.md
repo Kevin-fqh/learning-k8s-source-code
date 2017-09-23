@@ -7,7 +7,7 @@
 	- [使用RESTClient](#使用restclient)
 	- [基于Clientset生成eventClient](#基于clientset生成eventclient)
 	- [使用DynamicClient](#使用dynamicclient)
-  - [使用Clientset创建删除一个pod](#使用Clientset创建删除一个pod)
+  - [使用Clientset创建删除一个pod](#使用clientset创建删除一个pod)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
