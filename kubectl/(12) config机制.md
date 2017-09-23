@@ -7,7 +7,11 @@
   - [users模块](#users模块)
   - [contexts模块](#contexts模块)
   - [current-context](#current-context)
+  - [加载和合并kubeconfig规则](#加载和合并kubeconfig规则)
+  - [kubectl config命令](#kubectl-config命令)
   - [模板2](#模板2)
+
+kubectl config命令
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -63,7 +67,7 @@ context定义了一个命名的`cluster、user、namespace`元组，用于使用
 仅使用 cluster、user、namespace 之一指定上下文，或指定`none`。 
 
 未指定的值或在加载的 kubeconfig 中没有相应条目的命名值将被替换为默认值。
-加载和合并 kubeconfig 文件的规则很简单，但有很多，具体可以查看kubectl系列文章`Factory.md`。
+加载和合并 kubeconfig 文件的规则很简单，但有很多，具体可以查看[加载和合并kubeconfig规则](#加载和合并kubeconfig规则)。
 
 可以使用`kubectl config set-context`添加或修改上下文条目。
 
@@ -75,8 +79,76 @@ current-context 是作为`cluster、user、namespace`元组的 ”key“，
 
 可以使用`kubectl config use-context`更改 current-context。
 
+## 加载和合并kubeconfig规则
+根据下面的规则来生成一个clientcmd.ClientConfig。规则呈现如下层次结构
+
+一: 使用kubeconfig builder。这里的合并和覆盖次数有点多。
+
+1. 合并kubeconfig本身。 这是通过以下层次结构规则完成的
+	(1)CommandLineLocation - 这是从命令行解析的，so it must be late bound。
+       如果指定了这一点，则不会合并其他kubeconfig文件。 此文件必须存在。  
+	(2)如果设置了$KUBECONFIG，那么它被视为应该被合并的文件之一。  
+	(3)主目录位置 HomeDirectoryLocation ,即${HOME}/.kube/config==>/root/.kube/config
+	
+2. 根据此规则链中的第一个命中确定要使用的上下文---context
+	(1)命令行参数 - 再次从命令行解析，so it must be late bound  
+	(2)CurrentContext from the merged kubeconfig file  
+	(3)Empty is allowed at this stage
+3. 确定要使用的群集信息和身份验证信息。---cluster info and auth info  
+    在这里，我们可能有也可能没有上下文。他们是建立在这个规则链中的第一个命中。（运行两次，一次为auth，一次为集群）  
+	(1)命令行参数  
+	(2)If context is present, then use the context value  
+	(3)Empty is allowed
+4. 确定要使用的实际群集信息。---actual cluster info  
+    在这一点上，我们可能有也可能没有集群信息。基于下述规则链构建集群信息：  
+	(1)命令行参数  
+	(2)If cluster info is present and a value for the attribute is present, use it.  
+	(3)If you don't have a server location, bail.
+5. cluster info and auth info是使用同样的规则来进行创建的。  
+    除非你在auth info仅仅使用了一种认证方式。  
+	下述情况将会导致ERROR：  
+	(1)如果从命令行指定了两个冲突的认证方式，则失败。  
+	(2)如果命令行未指定，并且auth info具有冲突的认证方式，则失败。  
+	(3)如果命令行指定一个，并且auth info指定另一个，则遵守命令行指定的认证方式。
+	
+二: 对于任何仍然缺少的信息，使用默认值，并可能提示验证信息
+
+Kubeconfig 文件中的任何路径都相对于 kubeconfig 文件本身的位置进行解析。
+
+## kubectl config命令
+```shell
+$ kubectl config set-credentials myself --username=admin --password=secret
+$ kubectl config set-cluster local-server --server=http://localhost:8080
+$ kubectl config set-context default-context --cluster=local-server --user=myself
+$ kubectl config use-context default-context
+$ kubectl config set contexts.default-context.namespace the-right-prefix
+$ kubectl config view
+```
+产生对应的kubeconfig文件如下所示：
+```
+apiVersion: v1
+clusters:
+- cluster:
+    server: http://localhost:8080
+  name: local-server
+contexts:
+- context:
+    cluster: local-server
+    namespace: the-right-prefix
+    user: myself
+  name: default-context
+current-context: default-context
+kind: Config
+preferences: {}
+users:
+- name: myself
+  user:
+    password: secret
+    username: admin
+```
+
 ## 模版2
-最后，来看一个官方的模版
+最后，来看一个官方的详细一点模版
 ```
 current-context: federal-context
 apiVersion: v1

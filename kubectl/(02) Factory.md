@@ -99,7 +99,7 @@ type Factory interface {
 /*
 	译：func DefaultClientConfig 根据下面的规则来生成一个clientcmd.ClientConfig。规则呈现如下层次结构
 
-	一: 使用kubeconfig builder。这里的合并和覆盖次数有点疯狂。
+	一: 使用kubeconfig builder。这里的合并和覆盖次数有点多。
 		1、合并kubeconfig本身。 这是通过以下层次结构规则完成的：
 			(1)CommandLineLocation - 这是从命令行解析的，so it must be late bound。
 			   如果指定了这一点，则不会合并其他kubeconfig文件。 此文件必须存在。
