@@ -8,7 +8,7 @@
   - [client证书](#client证书)
   - [etcd使用cfssl](#etcd使用cfssl)
     - [客户端到服务器通信](#客户端到服务器通信)
-    - [对等(服务器到服务器/集群)通信](#对等(服务器到服务器/集群)通信)
+    - [对等(服务器到服务器/集群)通信](#对等（服务器到服务器/集群）通信)
     - [两个例子](#两个例子)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -51,8 +51,11 @@ peer certificate： is used by etcd cluster members as they communicate with eac
 ```
 cfssl gencert -initca ca-csr.json | cfssljson -bare ca -
 ```
-会得到ca-key.pem、ca.csr、ca.pem；其中 Please keep ca-key.pem file in safe. 
+会得到ca-key.pem、ca.csr、ca.ppem。
+
+其中 Please keep ca-key.pem file in safe. 
 This key allows to create any kind of certificates within your CA.
+
 csr证书在这里面用不到。至此，CA证书生成完毕，后面利用CA证书来生成server证书和client端的证书。
 
 ## server证书
@@ -110,20 +113,24 @@ cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=clie
 etcd通过命令行标志或环境变量获取几个证书相关的配置选项：
 
 ### 客户端到服务器通信
+```
 --cert-file = <path>：用于与etcd的SSL/TLS连接的证书。设置此选项时，advertise-client-urls可以使用HTTPS模式。
 --key-file = <path>：证书的密钥。必须未加密。
 --client-cert-auth：设置此选项后，etcd将检查所有来自受信任CA签署的客户端证书的传入HTTPS请求，因此不提供有效客户端证书的请求将失败。
 --trusted-ca-file = <path>：受信任的证书颁发机构。
 --auto-tls：对客户端的TLS连接使用自动生成的自签名证书。
+```
 
 
 ### 对等（服务器到服务器/集群）通信
 对等选项的工作方式与客户端到服务器选项的工作方式相同：
+```
 --peer-cert-file = <path>：用于对等体之间SSL / TLS连接的证书。这将用于侦听对等体地址以及向其他对等体发送请求。
 --peer-key-file = <path>：证书的密钥。必须未加密。
 --peer-client-cert-auth：设置时，etcd将检查来自集群的所有传入对等请求，以获得由提供的CA签名的有效客户端证书。
 --peer-trusted-ca-file = <path>：受信任的证书颁发机构。
 --peer-auto-tls：对对等体之间的TLS连接使用自动生成的自签名证书。
+```
 如果提供客户端到服务器或对等体证书，则还必须设置密钥。所有这些配置选项也可通过环境变量ETCD_CA_FILE，ETCD_PEER_CA_FILE等获得。
 
 
@@ -156,10 +163,16 @@ etcd --name infra0 --data-dir infra0 \
 ## 参考
 
 cfssl：
+
 https://coreos.com/etcd/docs/latest/op-guide/security.html#example-3-transport-security--client-certificates-in-a-cluster
+
 https://coreos.com/os/docs/latest/generate-self-signed-certificates.html
+
 openssl：
+
 http://www.cnblogs.com/breg/p/5923604.html
+
 etcd的api：
+
 https://coreos.com/etcd/docs/latest/v2/api.html
 
