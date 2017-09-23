@@ -564,7 +564,8 @@ func main() {
 
 	/*
 		删除刚创建的pod
-		关系到时间复杂度 需要加上UID保证唯一性
+		需要加上UID保证唯一性
+		Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 	*/
 	err = clientset.Core().Pods("default").Delete(
 		pod_handler.ObjectMeta.Name,
