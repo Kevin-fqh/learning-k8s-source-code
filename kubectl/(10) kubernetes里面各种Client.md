@@ -7,7 +7,7 @@
 	- [使用RESTClient](#使用restclient)
 	- [基于Clientset生成eventClient](#基于clientset生成eventclient)
 	- [使用DynamicClient](#使用dynamicclient)
-  - [使用Clientset创建一个rc](#使用clientset创建一个rc)
+  - [使用Clientset创建删除一个pod](#使用Clientset创建删除一个pod)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -479,9 +479,123 @@ func main() {
 }
 ```
 
-## 使用Clientset创建一个rc
+## 使用Clientset创建删除一个pod
+参考/k8s.io/client-go/kubernetes/typed/core/v1/core_client.go
 ```go
+package main
 
+import (
+	"flag"
+	"fmt"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/clientcmd"
+)
+
+var (
+	kubeconfig = flag.String("kubeconfig", "/home/fqhtool/bin/config", "absolute path to the kubeconfig file")
+)
+
+func main() {
+	flag.Parse()
+	// uses the current context in kubeconfig
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+	//自定义创建一个pod
+	desirepod := v1.Pod{
+		//通用必备属性TypeMeta和ObjectMeta
+		TypeMeta: unversioned.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "fqh-test-pod",
+			Namespace: "default",
+			Labels:    map[string]string{"name": "testapi"},
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyAlways,
+			Containers: []v1.Container{
+				v1.Container{
+					Name:  "testapi",
+					Image: "registry:v1",
+					Ports: []v1.ContainerPort{
+						v1.ContainerPort{
+							ContainerPort: 80,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	newpod, err := clientset.Core().Pods("default").Create(&desirepod)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("create pod successful")
+	//根据pod的名字来获取pod信息
+	pod_handler, err := clientset.Core().Pods("default").Get(newpod.ObjectMeta.Name)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(pod_handler)
+
+	//自定义创建一个namespace
+	desirenamespace := v1.Namespace{
+		TypeMeta: unversioned.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
+		ObjectMeta: v1.ObjectMeta{
+			Name:   "fqh-test-ns",
+			Labels: map[string]string{"name": "testapi"},
+		},
+	}
+	newnamespace, err := clientset.Core().Namespaces().Create(&desirenamespace)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("create ns successful", newnamespace)
+
+	/*
+		删除刚创建的pod
+		关系到时间复杂度 需要加上UID保证唯一性
+	*/
+	err = clientset.Core().Pods("default").Delete(
+		pod_handler.ObjectMeta.Name,
+		&v1.DeleteOptions{
+			Preconditions: &v1.Preconditions{
+				UID: &pod_handler.ObjectMeta.UID,
+			},
+		},
+	)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("delete pod successful")
+
+	/*
+		删除namespace
+	*/
+	err = clientset.Core().Namespaces().Delete(
+		newnamespace.ObjectMeta.Name,
+		&v1.DeleteOptions{
+			Preconditions: &v1.Preconditions{
+				UID: &newnamespace.ObjectMeta.UID,
+			},
+		},
+	)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("delete Namespaces successful")
+
+}
 ```
 
 ## 总结
