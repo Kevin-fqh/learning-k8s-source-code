@@ -11,8 +11,6 @@
   - [kubectl config命令](#kubectl-config命令)
   - [模板2](#模板2)
 
-kubectl config命令
-
 <!-- END MUNGE: GENERATED_TOC -->
 
 
