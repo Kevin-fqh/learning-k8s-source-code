@@ -84,18 +84,19 @@ current-context 是作为`cluster、user、namespace`元组的 ”key“，
 
 一: 使用kubeconfig builder。这里的合并和覆盖次数有点多。
 
-1. 合并kubeconfig本身。 这是通过以下层次结构规则完成的
-	(1)CommandLineLocation - 这是从命令行解析的，so it must be late bound。
-       如果指定了这一点，则不会合并其他kubeconfig文件。 此文件必须存在。  
+1. 合并kubeconfig本身。 这是通过以下层次结构规则完成的  
+    (1)CommandLineLocation - 这是从命令行解析的，so it must be late bound。  
+	   如果指定了这一点，则不会合并其他kubeconfig文件。 此文件必须存在。  
 	(2)如果设置了$KUBECONFIG，那么它被视为应该被合并的文件之一。  
 	(3)主目录位置 HomeDirectoryLocation ,即${HOME}/.kube/config==>/root/.kube/config
 	
-2. 根据此规则链中的第一个命中确定要使用的上下文---context
-	(1)命令行参数 - 再次从命令行解析，so it must be late bound  
+2. 根据此规则链中的第一个命中确定要使用的上下文---context  
+    (1)命令行参数 - 再次从命令行解析，so it must be late bound  
 	(2)CurrentContext from the merged kubeconfig file  
 	(3)Empty is allowed at this stage
 3. 确定要使用的群集信息和身份验证信息。---cluster info and auth info  
-    在这里，我们可能有也可能没有上下文。他们是建立在这个规则链中的第一个命中。（运行两次，一次为auth，一次为集群）  
+    在这里，我们可能有也可能没有上下文。  
+	他们是建立在这个规则链中的第一个命中。（运行两次，一次为auth，一次为集群）  
 	(1)命令行参数  
 	(2)If context is present, then use the context value  
 	(3)Empty is allowed
