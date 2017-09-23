@@ -6,19 +6,19 @@
 本文摘抄于[apiServer之go-restful的使用](http://dockone.io/article/2171)
 
 ## 关键组件
-1. Route
+### Route
 路由包含两种，一种是标准JSR311接口规范的实现RouterJSR311,一种是快速路由CurlyRouter。
 
 CurlyRouter支持正则表达式和动态参数，相比RouterJSR11更加轻量级，apiserver中使用的就是这种路由。
 
 一种Route的设定包含：请求方法(http Method)，请求路径(URL Path),输入输出类型(JSON/YAML)以及对应的回掉函数restful.RouteFunction，响应内容类型(Accept)等。
 
-2. WebService
+### WebService
 WebService逻辑上是Route的集合，功能上主要是为一组Route统一设置包括root path,请求响应的数据类型等一些通用的属性。
 
 需要注意的是，WebService必须加入到Container中才能生效。
 
-3. Container
+### Container
 Container逻辑上是WebService的集合，功能上可以实现多终端的效果。
 
 它包括一组restful.WebService和一个http.ServeMux对象，使用RouteSelector进行请求派发。
@@ -63,7 +63,7 @@ io.WriteString(resp, "second world")
 }
 ```
 
-4. Filter
+### Filter
 Filter用于动态的拦截请求和响应，类似于放置在相应组件前的钩子，在相应组件功能运行前捕获请求或者响应，主要用于记录log，验证，重定向等功能。
 go-restful中有三种类型的Filter：
 - Container Filter:
