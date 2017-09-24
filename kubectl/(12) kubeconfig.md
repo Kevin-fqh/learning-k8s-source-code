@@ -1,4 +1,4 @@
-# k8s里面的config
+# k8s里面的kubeconfig
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
