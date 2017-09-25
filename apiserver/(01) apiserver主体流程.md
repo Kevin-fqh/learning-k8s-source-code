@@ -3,8 +3,8 @@
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [main函数](#main函数)
-  - [准备开始Run Apiserver](#准备开始run-apiserver)
-
+  - [Run Apiserver](#run-apiserver)
+  - [New一个master](#new一个master)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -357,7 +357,7 @@ func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 
 至此，main()函数已经介绍完毕，下面进入`app.Run(s)`。
 
-## 准备开始Run Apiserver
+## Run Apiserver
 app.Run(s)接口实现在cmd/kube-apiserver/app/server.go。
 ```go
 // Run runs the specified APIServer.  This should never exit.
@@ -736,6 +736,8 @@ func Run(s *options.ServerRunOptions) error {
 }
 ```
 看看最后的生成一个master对象，并执行Run(wait.NeverStop)。
+
+## New一个master
 那么重点就来到了这个master对象是怎么样的？见pkg/master/master.go。
 ```go
 // New returns a new instance of Master from the given config.
@@ -894,4 +896,9 @@ func (c completedConfig) New() (*Master, error) {
 ```
 在这里，先不对master进行过于深度的讲解。
 至此，apiserver就已经run起来了，可以对外提供服务了。
+
+## 总结
+后面要讲解的内容包括
+- k8s里面最顶层的概念设计：`group、restmapper、scheme...`这些概念
+- api路由是怎么生成和管理的
 
