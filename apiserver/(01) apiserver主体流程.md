@@ -898,6 +898,8 @@ func (c completedConfig) New() (*Master, error) {
 至此，apiserver就已经run起来了，可以对外提供服务了。
 
 ## 总结
+本文主要走览了apiserver的参数设置，在run apiserver过程中以插件的形式启动认证、授权等模块。
+最后，new一个master对象，通过master对象来完成路由的注册。
 后面要讲解的内容包括
 - k8s里面最顶层的概念设计：`group、restmapper、scheme...`这些概念
 - api路由是怎么生成和管理的
