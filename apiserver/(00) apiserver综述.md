@@ -7,7 +7,8 @@
 
 ## 架构图
 
-![APiserver架构图]()
+![APiserver架构图](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/apiserver-00.jpeg)
+
 
 
 ## 参考
