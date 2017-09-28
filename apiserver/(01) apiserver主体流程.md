@@ -3,6 +3,7 @@
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [main函数](#main函数)
+  - [参数设置](#参数设置)
   - [Run Apiserver](#run-apiserver)
   - [New一个master](#new一个master)
   - [总结](#总结)
@@ -19,8 +20,8 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	/*
-		NewServerRunOptions新建一个apiserver对象
-		基本完成apiServer的运行参数初始化关键性步骤：
+		NewServerRunOptions新建一个ServerRunOptions对象
+		完成apiServer的运行参数初始化关键性步骤：
 			==>通过两个同名NewServerRunOptions()函数构建一个默认的ServerRunOptions对象
 
 		至于后面的s.AddFlags(pflag.CommandLine)就是获取命令行的输入信息，然后对s进行重新覆盖
@@ -39,7 +40,7 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	/*
-		将创建的apiserver对象传入app.Run()中，
+		将创建的ServerRunOptions对象传入app.Run()中，
 		最终绑定本地端口并绑定本地端口
 		并创建一个HTTP Server与一个HTTPS Server。
 
@@ -52,10 +53,12 @@ func main() {
 	}
 }
 ```
-1. main函数会首先根据相关的参数构建一个默认的ServerRunOptions参数对象s，其中`type ServerRunOptions struct`包含运行一个通用的api server所需的参数。
-2. 然后通过`s.AddFlags(pflag.CommandLine)`获取命令行的输入信息，对s进行重新覆盖。
+可以看出  
+1. main函数会首先根据相关的参数构建一个默认的ServerRunOptions参数对象s，其中`type ServerRunOptions struct`包含了运行一个通用的api server所需的参数。
+2. 然后通过`s.AddFlags(pflag.CommandLine)`获取命令行的输入信息，对s的值进行重新覆盖。
 3. 最后执行`Run(s)`。
 
+## 参数设置
 查看`ServerRunOptions`的构建过程，如下，/cmd/kube-apiserver/app/options/options.go
 ```go
 // ServerRunOptions runs a kubernetes api server.
@@ -268,7 +271,7 @@ type ServerRunOptions struct {
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
-	DefaultStorageVersions string
+	DefaultStorageVersions string //会被StorageVersions重写，本参数并不对外公开
 	TargetRAMMB            int
 	TLSCAFile              string //TLS CA文件
 	TLSCertFile            string //包含x509证书的文件路径，用于https认证
@@ -286,8 +289,8 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	/*
 		初始化的时候会有SecurePort、InsecurePort，实际就是对应HTTPS、HTTP的绑定端口。
-		这里的控制策略还是很全面的:
-		包括安全控制(CertDirectory, HTTPS默认启动)、
+		这里的控制策略包括:
+		安全控制(CertDirectory, HTTPS默认启动)、
 		权限控制(AdmissionControl,AuthorizationMode)、
 		服务限流控制(MaxRequestsInFlight)等。
 		具体的参数上面介绍结构体type ServerRunOptions基本都有提到。
@@ -304,7 +307,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		BindAddress: net.ParseIP("0.0.0.0"),
 		// 证书目录
 		CertDirectory: "/var/run/kubernetes",
-		// 默认的对象存储类型
+		// 默认持久化存储格式，即以json格式存储在etcd中
 		DefaultStorageMediaType: "application/json",
 		/*
 			registered.AllPreferredGroupVersions(),通过函数面值来调用，定义在
@@ -398,7 +401,17 @@ func Run(s *options.ServerRunOptions) error {
 		glog.Fatalf("Failed to generate service certificate: %v", err)
 	}
 
-	// 初始化能力集，多次运行apiserver也只会初始化一次
+	/*
+		定义在/pkg/capabilities/capabilities.go中的func Initialize(c Capabilities)
+		初始化capability集合
+		只能对每个二进制执行一次，后续调用将被忽略。（apiserver和kubelet都调用了）
+
+		apiserver和kubelet都有一个allow-privileged参数，
+		两者冲突时，咋整？？？？（apiserver管理全局？kubelet管理本节点？）
+
+		kubelet的参数使用是在/cmd/kubelet/app/server.go中的
+		==>capabilities.Setup(kubeCfg.AllowPrivileged, privilegedSources, 0)
+	*/
 	capabilities.Initialize(capabilities.Capabilities{
 		// 是否有超级权限
 		AllowPrivileged: s.AllowPrivileged,
@@ -430,7 +443,8 @@ func Run(s *options.ServerRunOptions) error {
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 
 	/*
-		   	后端存储etcd的反序列化缓存没有设置的话，会根据Target 的RAMMB值进行恰当的设置
+		   	后端存储etcd的反序列化缓存，
+			如果没有设置的话，会根据Target 的RAMMB值进行恰当的设置
 			TargetRAMMB：用户手动输入的apiServer的内存限制(单位：MB)
 			小于1000MB的话按1000MB算
 			默认值是0，也就是说没有设置
@@ -452,8 +466,8 @@ func Run(s *options.ServerRunOptions) error {
 		// capacity per node.
 		/*
 			译：这是从内存容量试图推断集群中最大节点数，并根据该值设置高速缓存大小的启发式方法。
-			   根据我们的文档，我们正式推荐2000个节点的集群为120GB，
-			   我们从那时起扩展。 因此，我们假设每个节点的容量大约为60MB。
+			   根据我们的文档，我们推荐2000个节点的集群为120GB，
+			   我们从这种条件开始扩展。 因此，我们假设每个节点的容量大约为60MB。
 		*/
 		// TODO: We may consider deciding that some percentage of memory will
 		// be used for the deserialization cache and divide it by the max object
