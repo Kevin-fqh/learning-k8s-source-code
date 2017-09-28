@@ -1,5 +1,23 @@
 # StorageVersions寻根
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [引子](#引子)
+  - [StorageVersions的定义](#StorageVersions的定义)
+  - [AllPreferredGroupVersions函数解读](#AllPreferredGroupVersions函数解读)
+  - [一堆关键数据结构](#一堆关键数据结构)
+    - [type APIRegistrationManager struct](#type-apiregistrationmanager-struct)
+	- [type GroupVersion struct](#type-groupversion-struct)
+	- [type GroupMeta struct](#type-groupmeta-struct)
+	- [type RESTMapper interface](#type-restmapper-interface)
+	- [GroupVersionKind,GroupVersionResource,GroupKind](#groupversionkind-groupversionresource-groupkind)
+	- [type RESTMapping struct](#type-restmapping-struct)
+	- [type RESTScope interface](#type-restscope-interface)
+	- [type ObjectConvertor interface](#type-objectconvertor-interface)
+	- [type MetadataAccessor interface](#type-metadataaccessor-interface)
+  - [总结](#总结)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 本文的目的是从StorageVersions出发，期望找出Apiserver复杂的多版本API管理过程中涉及到的概念，理清各个概念之间的调用关系、包含关系。
 ## 引子
@@ -287,7 +305,7 @@ type RESTMapper interface {
 ```
 这里延伸出来的概念就多了，GroupVersionKind、GroupVersionResource、GroupKind、RESTMapping。
 
-### GroupVersionKind、GroupVersionResource、GroupKind
+### GroupVersionKind GroupVersionResource GroupKind
 GroupVersionKind、GroupVersionResource、GroupKind 这三者和前面的GroupVersion一样，也是定义在pkg/api/unversioned/group_version.go之中。其实就是Group、Version、Kind、Resource的组合。
 ```go
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
