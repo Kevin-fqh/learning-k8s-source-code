@@ -108,7 +108,7 @@ func (m *APIRegistrationManager) AllPreferredGroupVersions() string {
 这里只是先把概念罗列出来，后面再就每一个结构体的具体作用进行详解。
 
 ### type APIRegistrationManager struct
-APIRegistrationManager负责对外提供已经注册并enable了的GroupVersions。
+显然，APIRegistrationManager负责对外提供已经注册并enable了的GroupVersions。
 ```go
 /*
 	type APIRegistrationManager struct 简介：
@@ -230,8 +230,12 @@ type GroupMeta struct {
 }
 ```
 
-## type RESTMapper interface
-这里有个`RESTMapper`的概念
+### type RESTMapper interface
+这里有个`RESTMapper`的概念，RESTMapper是一个interface，声明了一组函数接口。
+
+RESTMapper可以从GVR获取GVK，并基于GVK生成一个RESTMapping来处理该GVR。
+
+RESTMapping中有Resource名称，GVK，Scope，Convertor，Accessor等和GVR有关的信息。
 ```go
 // RESTMapper allows clients to map resources to kind, and map kind and version
 // to interfaces for manipulating those objects. It is primarily intended for
@@ -282,6 +286,249 @@ type RESTMapper interface {
 }
 ```
 这里延伸出来的概念就多了，GroupVersionKind、GroupVersionResource、GroupKind、RESTMapping。
+
+### GroupVersionKind、GroupVersionResource、GroupKind
+GroupVersionKind、GroupVersionResource、GroupKind 这三者和前面的GroupVersion一样，也是定义在pkg/api/unversioned/group_version.go之中。其实就是Group、Version、Kind、Resource的组合。
+```go
+// GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
+// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type GroupVersionKind struct {
+	Group   string `protobuf:"bytes,1,opt,name=group"`
+	Version string `protobuf:"bytes,2,opt,name=version"`
+	Kind    string `protobuf:"bytes,3,opt,name=kind"`
+}
+
+// GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
+// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type GroupVersionResource struct {
+	Group    string `protobuf:"bytes,1,opt,name=group"`
+	Version  string `protobuf:"bytes,2,opt,name=version"`
+	Resource string `protobuf:"bytes,3,opt,name=resource"`
+}
+
+// GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
+// concepts during lookup stages without having partially valid types
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type GroupKind struct {
+	Group string `protobuf:"bytes,1,opt,name=group"`
+	Kind  string `protobuf:"bytes,2,opt,name=kind"`
+}
+```
+
+那么问题来了，Group、Version、Kind、Resource分别是什么？怎么使用？
+这个可以查看kubectl系列文章中[kubernetes里面各种Client]()一文
+- Resource
+```go
+// APIResource specifies the name of a resource and whether it is namespaced.
+type APIResource struct {
+	// name is the name of the resource.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// namespaced indicates if a resource is namespaced or not.
+	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
+	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
+	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
+}
+
+reousrce := unversioned.APIResource{
+		Name:       "nodes", //单数复数
+		Namespaced: false,
+		Kind:       "Node", //首字母大写
+	}
+reousrce = unversioned.APIResource{
+		Name:       "pods",
+		Namespaced: true,
+		Kind:       "Pod",
+	}
+```
+
+- Kind
+那么可以得出，Kind就是定义在`/kubernetes-1.5.2/pkg/api/types.go`中的各种结构体，这里的`/kubernetes-1.5.2/pkg/api/types.go`的数据结构都是internal version的对象。如
+```go
+type Pod struct
+type PodList struct
+
+type Node struct
+type NodeList struct
+```
+从这里可以发现每一个结构体都会有一个对应的List结构体，Pod->PodList，Node->NodeList。
+这个List结构体好像是必须要有的。
+
+- Group、Version
+那么Group、Version的值呢？定义在`/kubernetes-1.5.2/pkg/api/v1/types.go`中的是一个external version，如下：
+```
+Group="core"
+Version=v1
+```
+
+- 小结
+至此，Group、Version、Kind、Resource就已经清楚了。而GroupVersionKind、GroupVersionResource、GroupKind无非就是某个Group的某个Version中的Kind、Resource。
+
+注意是某个Group 的一个Version，而不是某个Version的一个Group。
+注意区别！这个和Apiserver对多版本的组织相关。
+可以这么来理解，各个Group是相互独立的，发育程度也不一样，有快有慢，而kubernetes是以插件的形式来使用各个Group的。
+这就提供了很大的灵活性。可以根据需求决定使用A Group的哪一个Version。
+
+### type RESTMapping struct
+RESTMapping包含以RESTful方式处理一个特定的resource and kind的对象所需的信息。
+定义在/kubernetes-1.5.2/pkg/api/meta/interfaces.go中。
+```go
+/*
+	RESTMapping包含一个Resource名称，
+	及其对应的GVK，
+	还有一个Scope(标明资源是否为root或者namespaced)，
+	还有一个Convertor用来转换该GVK对应的Object
+	和一个MetadataAccessor用来提取Object的meta信息。
+
+	那么RESTMapping怎么用呢？
+	比如/pkg/apiserver/api_installer.go中就有使用到RESTMapping中的Scope用来生成合适的URL(RESTScopeNameRoot和RESTScopeNameNamespace处理不同)。
+	再比如/pkg/kubectl/resource_printer.go中的VersionedPrinter中的converter也是来自RESTMapping中的Convertor(以后和Scheme一起分析)。
+*/
+type RESTMapping struct {
+	// Resource is a string representing the name of this resource as a REST client would see it
+	Resource string
+
+	GroupVersionKind unversioned.GroupVersionKind
+
+	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
+	Scope RESTScope
+
+	runtime.ObjectConvertor
+	MetadataAccessor
+}
+```
+继续，这里出来了个RESTScope、ObjectConvertor和MetadataAccessor
+
+### type RESTScope interface
+RESTScope用于标识某个资源是处于Namespace下，还是全局资源(没有Namespace)。
+```go
+const (
+	/*
+		RESTScopeNamespace表明该资源是在Namespace下的，如pods，rc等；
+		RESTScopeRoot标明资源是全局的，如nodes, pv等。
+	*/
+	RESTScopeNameNamespace RESTScopeName = "namespace"
+	RESTScopeNameRoot      RESTScopeName = "root"
+)
+
+// RESTScope contains the information needed to deal with REST resources that are in a resource hierarchy
+/*
+	译：RESTScope包含处理资源层次结构中的REST资源所需的信息
+
+	RESTScope具体由type restScope struct实现。restScope定义在/pkg/api/meta/restmapper.go中
+*/
+type RESTScope interface {
+	// Name of the scope
+	Name() RESTScopeName
+	// ParamName is the optional name of the parameter that should be inserted in the resource url
+	// If empty, no param will be inserted
+	ParamName() string
+	// ArgumentName is the optional name that should be used for the variable holding the value.
+	ArgumentName() string
+	// ParamDescription is the optional description to use to document the parameter in api documentation
+	ParamDescription() string
+}
+```
+
+### type ObjectConvertor interface
+Convertor用来转换该GVK对应的Object，定义在/pkg/runtime/interfaces.go
+```go
+// ObjectConvertor converts an object to a different version.
+/*
+	ObjectConvertor将一个object转换为不同的版本。
+*/
+type ObjectConvertor interface {
+	// Convert attempts to convert one object into another, or returns an error. This method does
+	// not guarantee the in object is not mutated. The context argument will be passed to
+	// all nested conversions.
+	Convert(in, out, context interface{}) error
+	// ConvertToVersion takes the provided object and converts it the provided version. This
+	// method does not guarantee that the in object is not mutated. This method is similar to
+	// Convert() but handles specific details of choosing the correct output version.
+	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
+	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
+}
+```
+
+### type MetadataAccessor interface
+type MetadataAccessor interface可以让你在任何external version或者internal version中操作object和list这些metadata。
+
+如果尝试在不支持该字段（名称，UID，列表上的命名空间）的对象上设置或检索字段，将是无效且返回默认值。
+
+MetadataAccessor以一种方式暴露interface，可以被多个object使用。
+```go
+type MetadataAccessor interface {
+	APIVersion(obj runtime.Object) (string, error)
+	SetAPIVersion(obj runtime.Object, version string) error
+
+	Kind(obj runtime.Object) (string, error)
+	SetKind(obj runtime.Object, kind string) error
+
+	Namespace(obj runtime.Object) (string, error)
+	SetNamespace(obj runtime.Object, namespace string) error
+
+	Name(obj runtime.Object) (string, error)
+	SetName(obj runtime.Object, name string) error
+
+	GenerateName(obj runtime.Object) (string, error)
+	SetGenerateName(obj runtime.Object, name string) error
+
+	UID(obj runtime.Object) (types.UID, error)
+	SetUID(obj runtime.Object, uid types.UID) error
+
+	SelfLink(obj runtime.Object) (string, error)
+	SetSelfLink(obj runtime.Object, selfLink string) error
+
+	Labels(obj runtime.Object) (map[string]string, error)
+	SetLabels(obj runtime.Object, labels map[string]string) error
+
+	Annotations(obj runtime.Object) (map[string]string, error)
+	SetAnnotations(obj runtime.Object, annotations map[string]string) error
+
+	runtime.ResourceVersioner
+}
+
+//runtime.Object 定义在/pkg/runtime/interfaces.go
+
+// All API types registered with Scheme must support the Object interface. Since objects in a scheme are
+// expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
+// serializers to set the kind, version, and group the object is represented as. An Object may choose
+// to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
+/*
+	译：在Scheme中注册的所有API类型都必须支持Object接口。
+		这是因为在scheme中的objects是会被序列化成线的，所以一个Object必须提供接口给scheme来序列化地设置其kidn、version、group。
+		在不需要序列化的情况下，Object可以选择返回一个无操作的ObjectKindAccessor。
+*/
+type Object interface {
+	GetObjectKind() unversioned.ObjectKind
+}
+
+// ResourceVersioner provides methods for setting and retrieving
+// the resource version from an API object.
+//设置和接收一个API object的resource version
+type ResourceVersioner interface {
+	SetResourceVersion(obj Object, version string) error
+	ResourceVersion(obj Object) (string, error)
+}
+```
+
+## 总结
+本章节主要是从APIRegistrationManager出发，然后主要讲解到了RESTMapper、Group、Version、Kind、Resource、RESTMapping等概念。
+重点注意到是某个Group 的一个Version，而不是某个Version的一个Group。
+
+这个和Apiserver对多版本的组织相关。
+各个Group是相互独立的，发育程度也不一样，有快有慢，而kubernetes是以插件的形式来使用各个Group的。
+这就提供了很大的灵活性。可以根据需求决定使用A Group的哪一个Version。
+
+到这之后，是不是感觉数据结构太多了。。我们可以进行整理一下，如图所示。
+![多个数据结构总结](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/StorageVersions-00.jpeg)
+
+显然APIRegistrationManager是下一步要了解的入手点。
+
 
 
 
