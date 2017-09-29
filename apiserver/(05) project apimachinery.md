@@ -1,16 +1,17 @@
-# 开源项目apimachinery
+# project apimachinery
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [开源项目apimachinery](#开源项目apimachinery)
+  - [project apimachinery](#project-apimachinery)
   - [k8s里面的apimachinery package](#k8s里面的apimachinery-package)
+  - [project apimachinery中各个package的作用](#project-apimachinery中各个package的作用)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-首先弄清两个apimachinery的范畴
+首先弄清两个apimachinery的范畴，一个是project，一个是k8s里面的一个package，但其实都是一个东西。
 
-## 开源项目apimachinery
+## project apimachinery
 查看项目[kubernetes/apimachinery](https://github.com/kubernetes/apimachinery)的介绍，
 
 Scheme, typing, encoding, decoding, and conversion packages for Kubernetes and Kubernetes-like API objects。
@@ -48,7 +49,7 @@ pkg/apimachinery/registered	Package to keep track of API Versions that can be re
 
 ```
 
-## 开源项目apimachinery中各个package的作用
+## project apimachinery中各个package的作用
 先来个总体的概念，后面才好更好地渐入佳境。根据整理得出。
 ```
 pkg/api/errors	提供了api字段验证的详细错误类型。－Package errors provides detailed error types for api field validation.
@@ -156,15 +157,15 @@ third_party/forked/golang/reflect	Package reflect is a fork of go's standard lib
 ```
 
 ## 总结
-本文主要对开源项目apimachinery来了个整体性的介绍，并没有深入讲解，但相信，了解这些项目的由来对后面深入学习k8s的机制是很有帮助的。
+本文主要对开源项目apimachinery来了个整体性的介绍，并没有深入讲解，但相信，了解这些项目的由来和关系对后面深入学习k8s的机制是很有帮助的。
 
 下一篇将对[k8s里面的apimachinery package](#k8s里面的apimachinery-package)进行讲解。
 
 
 
 ## 参考
-[kubernetes-apimachinery](https://github.com/kubernetes/apimachinery)
+[开源项目-apimachinery](https://github.com/kubernetes/apimachinery)
 
-[godoc-apimachinery](https://godoc.org/k8s.io/apimachinery)
+[godoc-开源项目apimachinery](https://godoc.org/k8s.io/apimachinery)
 
-[k8s.io/apiserver](https://github.com/kubernetes/apiserver)
+[开源项目-apiserver](https://github.com/kubernetes/apiserver)
