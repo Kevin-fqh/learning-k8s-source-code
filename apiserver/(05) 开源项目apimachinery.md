@@ -30,13 +30,13 @@ This library is a shared dependency for servers and clients to work with Kuberne
 ## k8s里面的apimachinery package
 我们来查看k8s源码里面的目录结构
 ```
-					  -------announced
+                     -------announced
                      |
                      |
 pkg---apimachinery----------registered
                      |
                      |
-					  -----type.go					  
+                     -----type.go					  
 ```
 三个package的作用
 ```
