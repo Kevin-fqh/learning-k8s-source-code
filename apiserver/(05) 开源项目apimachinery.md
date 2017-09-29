@@ -34,7 +34,7 @@ This library is a shared dependency for servers and clients to work with Kuberne
 					  |
 					  |
 pkg---apimachinery----------registered
-                     |
+					  |
 					  |
 					  -----type.go					  
 ```
@@ -157,6 +157,7 @@ third_party/forked/golang/reflect	Package reflect is a fork of go's standard lib
 
 ## 总结
 本文主要对开源项目apimachinery来了个整体性的介绍，并没有深入讲解，但相信，了解这些项目的由来对后面深入学习k8s的机制是很有帮助的。
+
 下一篇将对[k8s里面的apimachinery package](#k8s里面的apimachinery-package)进行讲解。
 
 
