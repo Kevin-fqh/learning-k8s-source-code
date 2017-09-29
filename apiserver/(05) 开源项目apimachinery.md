@@ -31,11 +31,11 @@ This library is a shared dependency for servers and clients to work with Kuberne
 我们来查看k8s源码里面的目录结构
 ```
 					  -------announced
-					  |
-					  |
+                     |
+                     |
 pkg---apimachinery----------registered
-					  |
-					  |
+                     |
+                     |
 					  -----type.go					  
 ```
 三个package的作用
