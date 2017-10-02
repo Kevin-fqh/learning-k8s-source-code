@@ -185,6 +185,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		向Scheme注册unvertioned type
 	*/
 	scheme.AddUnversionedTypes(Unversioned,
+		/*
+			这些Type定义在/pkg/api/unversioned/types.go
+		*/
 		&unversioned.ExportOptions{},
 		&unversioned.Status{},
 		&unversioned.APIVersions{},

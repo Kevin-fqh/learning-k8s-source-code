@@ -14,7 +14,6 @@
 
 初始化apiserver core v1的过程中，生成groupMeta的时候用到`RESTMapper: newRESTMapper(externalVersions),`。我们从这里开始研究RESTMapper。
 
-## newRESTMapper函数
 ```go
 /*
 	RESTMapper其实包含的是一种转换关系，
@@ -33,7 +32,9 @@
 	resource要区分单复数，是为了获取Pods信息。
 	比如可以kubectl get pod，也可以kubectl get pods.
 */
-
+```
+## newRESTMapper函数
+```go
 /*
 	所有的api资源可以分为两类：一类是有namespace，另一类是没有namespace。
 	比如下面func newRESTMapper方法中的Node、Namespace、PersistentVolume、ComponentStatus不属于任何namespace。
