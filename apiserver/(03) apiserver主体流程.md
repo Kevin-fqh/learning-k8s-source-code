@@ -918,4 +918,5 @@ func (c completedConfig) New() (*Master, error) {
 后面要讲解的内容包括
 - k8s里面最顶层的概念设计：`group、restmapper、scheme...`这些概念
 - api路由是怎么生成和管理的
+- apiserver的多版本API管理机制
 

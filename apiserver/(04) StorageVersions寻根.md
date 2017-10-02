@@ -3,8 +3,8 @@
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [引子](#引子)
-  - [StorageVersions的定义](#StorageVersions的定义)
-  - [AllPreferredGroupVersions函数解读](#AllPreferredGroupVersions函数解读)
+  - [StorageVersions的定义](#storageversions的定义)
+  - [AllPreferredGroupVersions函数解读](#allpreferredgroupversions函数解读)
   - [一堆关键数据结构](#一堆关键数据结构)
     - [type APIRegistrationManager struct](#type-apiregistrationmanager-struct)
 	- [type GroupVersion struct](#type-groupversion-struct)
@@ -19,7 +19,7 @@
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-本文的目的是从StorageVersions出发，期望找出Apiserver复杂的多版本API管理过程中涉及到的概念，理清各个概念之间的调用关系、包含关系。
+本文的目的是从StorageVersions出发，期望找出Apiserver复杂的多版本API管理过程中涉及到的`概念接口`，理清各个概念之间的调用关系、包含关系。
 ## 引子
 前文提到，在`/pkg/genericapiserver/options/server_run_options.go`中有
 ```go
@@ -138,7 +138,7 @@ type APIRegistrationManager struct {
 	// registeredGroupVersions stores all API group versions for which RegisterGroup is called.
 	/*
 		所有已经registered的GroupVersions
-		都是通过调用RegisterGroup方法来进行注册的
+		都是通过调用RegisterVersions()方法来进行注册的
 
 		unversioned.GroupVersion定义在
 		==> pkg/api/unversioned/group_version.go
@@ -148,7 +148,10 @@ type APIRegistrationManager struct {
 
 	// thirdPartyGroupVersions are API versions which are dynamically
 	// registered (and unregistered) via API calls to the apiserver
-	// 第三方注册的GroupVersions,这些都向apiServer动态注册的
+	/*
+		第三方注册的GroupVersions,这些都向apiServer动态注册的
+		使用AddThirdPartyAPIGroupVersions()进行注册
+	*/
 	thirdPartyGroupVersions []unversioned.GroupVersion
 
 	// enabledVersions represents all enabled API versions. It should be a
@@ -173,7 +176,9 @@ type APIRegistrationManager struct {
 	// KUBE_API_VERSIONS environment variable. The install package of each group
 	// checks this list before add their versions to the latest package and
 	// Scheme.  This list is small and order matters, so represent as a slice
-	// 跟环境变量'KUBE_API_VERSIONS'有关
+	/*
+		存储KUBE_API_VERSIONS环境变量包含的版本，如果未指定，则KUBE_API_VERSIONS为空
+	*/
 	envRequestedVersions []unversioned.GroupVersion
 }
 ```
@@ -546,12 +551,3 @@ type ResourceVersioner interface {
 ![多个数据结构总结](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/StorageVersions-00.jpeg)
 
 显然APIRegistrationManager是下一步要了解的入手点。
-
-
-
-
-
-
-
-
-

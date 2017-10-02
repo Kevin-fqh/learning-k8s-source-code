@@ -9,7 +9,8 @@
 
 <!-- END MUNGE: GENERATED_TOC -->
 
-首先弄清两个apimachinery的范畴，一个是project，一个是k8s里面的一个package，但其实都是一个东西。
+首先弄清两个apimachinery的范畴，一个是project，一个是k8s里面的一个package，前者包含了后者。
+k8s是前者的消费者。
 
 ## project apimachinery
 查看项目[kubernetes/apimachinery](https://github.com/kubernetes/apimachinery)的介绍，
@@ -92,9 +93,9 @@ pkg/fields	Package fields implements a simple field system, parsing and matching
 
 pkg/labels	Package labels implements a simple label system, parsing and matching selectors with sets of labels.
 
-pkg/runtime	Defines conversions between generic types and structs to map query strings to struct objects.
+pkg/runtime	   Defines conversions between generic types and structs to map query strings to struct objects.
 
-pkg/runtime/schema	Package schema is a generated protocol buffer package.
+pkg/runtime/schema	  Package schema is a generated protocol buffer package.
 
 pkg/runtime/serializer	
 
@@ -119,24 +120,24 @@ pkg/util/cache
 pkg/util/clock	
 pkg/util/diff
 	
-pkg/util/errors	Package errors implements various utility functions and types around errors.
+pkg/util/errors	  Package errors implements various utility functions and types around errors.
 
-pkg/util/framer	Package framer implements simple frame decoding techniques for an io.ReadCloser
+pkg/util/framer	  Package framer implements simple frame decoding techniques for an io.ReadCloser
 
 pkg/util/httpstream	Package httpstream adds multiplexed streaming support to HTTP requests and responses via connection upgrades.
 
 pkg/util/httpstream/spdy
 pkg/util/initialization	
-pkg/util/intstr	Package intstr is a generated protocol buffer package.
+pkg/util/intstr	   Package intstr is a generated protocol buffer package.
 pkg/util/json	
 pkg/util/jsonmergepatch	
 pkg/util/mergepatch	
 pkg/util/net	
-pkg/util/proxy	Package proxy provides transport and upgrade support for proxies.
-pkg/util/rand	Package rand provides utilities related to randomization.
+pkg/util/proxy	  Package proxy provides transport and upgrade support for proxies.
+pkg/util/rand	  Package rand provides utilities related to randomization.
 pkg/util/remotecommand	
 pkg/util/runtime	
-pkg/util/sets	Package sets has auto-generated set types.
+pkg/util/sets	 Package sets has auto-generated set types.
 pkg/util/sets/types	Package types just provides input types to the set generator.
 pkg/util/strategicpatch	
 pkg/util/uuid	
@@ -144,15 +145,15 @@ pkg/util/validation
 pkg/util/validation/field	
 pkg/util/wait	Package wait provides tools for polling or listening for changes to a condition.
 pkg/util/yaml	
-pkg/version	Package version supplies the type for version information collected at build time.
+pkg/version	  Package version supplies the type for version information collected at build time.
 
 pkg/watch	Package watch contains a generic watchable interface, and a fake for testing code that uses the watch interface.
 
-third_party/forked/golang/json	Package json is forked from the Go standard library to enable us to find the field of a struct that a given JSON key maps to.
+third_party/forked/golang/json	  Package json is forked from the Go standard library to enable us to find the field of a struct that a given JSON key maps to.
 
 third_party/forked/golang/netutil	
 
-third_party/forked/golang/reflect	Package reflect is a fork of go's standard library reflection package, which allows for deep equal with equality functions defined.
+third_party/forked/golang/reflect	  Package reflect is a fork of go's standard library reflection package, which allows for deep equal with equality functions defined.
 
 ```
 
