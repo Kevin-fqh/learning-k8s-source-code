@@ -284,7 +284,7 @@ func NewAPIRegistrationManager(kubeAPIVersions string) (*APIRegistrationManager,
 	return m, nil
 }
 ```
-* RegisterVersions
+* RegisterVersions  
 向APIRegistrationManager注册GroupVersion
 ```go
 // RegisterVersions adds the given group versions to the list of registered group versions.
@@ -299,7 +299,7 @@ func (m *APIRegistrationManager) RegisterVersions(availableVersions []unversione
 }
 ```
 
-* RegisterGroup
+* RegisterGroup  
 向APIRegistrationManager注册groupMeta
 ```go
 // RegisterGroup adds the given group to the list of registered groups.
@@ -323,7 +323,7 @@ func (m *APIRegistrationManager) RegisterGroup(groupMeta apimachinery.GroupMeta)
 }
 ```
 
-* EnableVersions
+* EnableVersions  
 设置一个GroupVersion为enable，激活它
 ```go
 // EnableVersions adds the versions for the given group to the list of enabled versions.
