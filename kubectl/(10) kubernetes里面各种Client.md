@@ -601,6 +601,7 @@ func main() {
 
 ## 总结
 RESTClient是Kubernetes最基础的Client，封装了一个http client。
+
 restclient 是dynamic client和clientset的基础，支持json与protobuf，可以访问所有资源，实现对自定义thirdpartresource资源的获取。
 
 clientset的用法比较简单，而且也是k8s里面用得最多的。
