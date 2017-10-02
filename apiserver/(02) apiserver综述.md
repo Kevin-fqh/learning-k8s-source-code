@@ -29,40 +29,6 @@ core v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pk
 也就是说，如果一个Struct A如果在internal version中仅定义属性a；同时在一个external version中定义了属性a和b。
 那么，当Struct A的对象持久化存储到etcd中时，仅有a属性会被存储下来，属性b并不会被保存下来。
 
-## Apiserver启动时初始化流程
-1. initial.go中的初始化主要用internal version和external versions填充了Scheme，完成了 APIRegistrationManager中GroupMeta的初始化。GroupMeta的主要用于后面的初始化APIGroupVersion。
-
-2. GroupMeta包含成员其中就有Groupversion、RESTMapper。初始化groupMeta的时候会根据Scheme和externalVersions新建一个RESTMapper。
-
-3. /pkg/registry/core/rest/storage_core.go中的NewLegacyRESTStorage基于上面的Scheme和GroupMeta生成了一个APIGroupInfo。
-
-4. 然后基于APIGroupInfo生成一个APIGroupVersion。
-
-5. 然后基于APIGroupVersion生成一个master。
-
-```go
-重要结构体:
-一：
-	APIGroupVersion===>定义在pkg/apiserver/apiserver.go==>type APIGroupVersion struct
-	创建APIGroupVersion的地方在/pkg/genericapiserver/genericapiserver.go中的
-		--->func (s *GenericAPIServer) newAPIGroupVersion
-	*************************
-	*************************
-	-->可以从/pkg/master/master.go中的-->func (c completedConfig) New() (*Master, error)中的
-	-->m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider) 和
-	   m.InstallAPIs(c.Config.GenericConfig.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
-	   开始分析
-
-二：
-	APIRegistrationManager===>/pkg/apimachinery/registered/registered.go==>type APIRegistrationManager struct
-	创建APIRegistrationManager的地方在/pkg/apimachinery/registered/registered.go中
-
-总结：
-	综合上面所有的初始化可以看到（APIGroupVersion、APIGroupInfo、Scheme、GroupMeta、RESTMapper、APIRegistrationManager），
-	其实主要用internal version和external versions填充Scheme，
-	用external versions去填充GroupMeta以及其成员RESTMapper。
-	GroupMeta有啥作用呢？主要用于初始化APIGroupVersion。
-```
 
 
 
