@@ -2,7 +2,7 @@
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [addVersionsToScheme 函数](#addversionstoscheme 函数)
+  - [addVersionsToScheme 函数](#addversionstoscheme-函数)
   - [向Scheme注册internal version](#向scheme注册internal-version)
   - [SchemeBuilder](#schemebuilder)
   - [向Scheme注册enabled external versions](#向scheme注册enabled-external-versions)

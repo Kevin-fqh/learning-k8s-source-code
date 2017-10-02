@@ -5,7 +5,7 @@
   - [全局唯一的Scheme对象](#全局唯一的scheme对象)
   - [Scheme的定义](#scheme的定义)
     - [type Scheme struct](#type-scheme-struct)
-  - [NewScheme 函数](#newscheme 函数)
+  - [NewScheme 函数](#newscheme-函数)
 
   - [总结](#总结)
 
