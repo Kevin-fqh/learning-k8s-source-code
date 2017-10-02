@@ -181,7 +181,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	// Register Unversioned types under their own special group
 	/*
-		在GroupName为空，Version为"v1"的groupVersion中，添加这些对象到Scheme
+		var Unversioned = unversioned.GroupVersion{Group: "", Version: "v1"}
+		向Scheme注册unvertioned type
 	*/
 	scheme.AddUnversionedTypes(Unversioned,
 		&unversioned.ExportOptions{},

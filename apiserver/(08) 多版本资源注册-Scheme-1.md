@@ -6,7 +6,14 @@
   - [Scheme的定义](#scheme的定义)
     - [type Scheme struct](#type-scheme-struct)
   - [NewScheme 函数](#newscheme-函数)
-
+  - [Sheme实现的函数接口](#sheme实现的函数接口)
+    - [addKnownTypes](#addknowntypes)
+    - [AddUnversionedTypes](#addunversionedtypes)
+    - [总结](#总结)
+	- [总结](#总结)
+	- [总结](#总结)
+	- [总结](#总结)
+	- [总结](#总结)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -207,7 +214,8 @@ func NewScheme() *Scheme {
 }
 ```
 
-## addKnownTypes
+## Sheme实现的函数接口
+### addKnownTypes
 AddKnownTypes()为Scheme的type注册函数，参数为GV及types，其中types和GV先组成GVK，然后向gvkToType和typeToGVK填充Type和GVK的关系。
 ```go
 // AddKnownTypes registers all types passed in 'types' as being members of version 'version'.
@@ -215,7 +223,7 @@ AddKnownTypes()为Scheme的type注册函数，参数为GV及types，其中types�
 // the struct becomes the "kind" field when encoding. Version may not be empty - use the
 // APIVersionInternal constant if you have a type that does not have a formal version.
 /*
-	译：AddKnownTypes将“types”中传递的所有类型注册为版本“version”的成员。
+	译：AddKnownTypes将入参“types”中传递的所有类型注册为版本“version”的成员。
 		传递给“types”的所有对象都应该是指向结构体的指针。
 		编码时，该结构的名称为“kind”字段。
 		版本可能不为空 - 如果您使用一个不具有正式版本的“type”，请使用APIVersionInternal常量。
@@ -255,6 +263,36 @@ func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...Object) {
 }
 ```
 
-## 
+### AddUnversionedTypes  
+AddUnversionedTypes将入参所提供的types注册为“unversioned”，这意味着它们遵循特殊规则。
+每当这种types的对象被序列化时，它将使用入参提供的group version进行序列化，并且不被转换。
+因此，unversioned objects 预计将永远保持向后兼容，就好像它们处于不会更新的API组和版本。
+```go
+// AddUnversionedTypes registers the provided types as "unversioned", which means that they follow special rules.
+// Whenever an object of this type is serialized, it is serialized with the provided group version and is not
+// converted. Thus unversioned objects are expected to remain backwards compatible forever, as if they were in an
+// API group and version that would never be updated.
+
+// TODO: there is discussion about removing unversioned and replacing it with objects that are manifest into every version with particular schemas. Resolve this method at that point.
+
+/*
+	AddUnversionedTypes()方法可以向Scheme注册unvertioned type，
+	Unversioned type不需要进行转换。
+*/
+func (s *Scheme) AddUnversionedTypes(version unversioned.GroupVersion, types ...Object) {
+	s.AddKnownTypes(version, types...)
+	for _, obj := range types {
+		t := reflect.TypeOf(obj).Elem()
+		gvk := version.WithKind(t.Name())
+		s.unversionedTypes[t] = gvk
+		if _, ok := s.unversionedKinds[gvk.Kind]; ok {
+			panic(fmt.Sprintf("%v has already been registered as unversioned kind %q - kind name must be unique", reflect.TypeOf(t), gvk.Kind))
+		}
+		s.unversionedKinds[gvk.Kind] = t
+	}
+}
+```
+
+###  
 
 ## 总结
