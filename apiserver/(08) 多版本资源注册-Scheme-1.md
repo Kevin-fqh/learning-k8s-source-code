@@ -5,7 +5,7 @@
   - [全局唯一的Scheme对象](#全局唯一的scheme对象)
   - [Scheme的定义](#scheme的定义)
     - [type Scheme struct](#type-scheme-struct)
-  - [NewScheme()函数](#newscheme()函数)
+  - [NewScheme 函数](#newscheme 函数)
 
   - [总结](#总结)
 
@@ -13,11 +13,13 @@
 
 本文主要对Scheme的定义和提供的功能函数进行介绍。
 
-在初始化apiserver core v1的过程中，`addVersionsToScheme(externalVersions...)`，将所有的GroupVersions添加到Scheme。那么Scheme的定义和作用是什么呢？
+在初始化apiserver core v1的过程中，`addVersionsToScheme(externalVersions...)`，将所有的GroupVersions添加到Scheme。那么Scheme的定义和作用是什么呢？本文主要介绍：
+- 是如何对Scheme进行初始化的？
+- Scheme的定义和功能函数
 
 ## 全局唯一的Scheme对象
 Apiserver全局范围内，只有一个Scheme，即api.Scheme。
-所有的GroupVersion受这个api.Scheme管理。
+所有的GroupVersion受这个api.Scheme管理。所有的GroupVersion都是往这个全局唯一的api.Scheme里面注册。
 定义在pkg/api/register.go。
 ```go
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
@@ -162,7 +164,8 @@ type Scheme struct {
 }
 ```
 
-## NewScheme()函数
+## NewScheme 函数
+初始化一个新的Scheme
 ```go
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 /*
@@ -203,3 +206,55 @@ func NewScheme() *Scheme {
 	return s
 }
 ```
+
+## addKnownTypes
+AddKnownTypes()为Scheme的type注册函数，参数为GV及types，其中types和GV先组成GVK，然后向gvkToType和typeToGVK填充Type和GVK的关系。
+```go
+// AddKnownTypes registers all types passed in 'types' as being members of version 'version'.
+// All objects passed to types should be pointers to structs. The name that go reports for
+// the struct becomes the "kind" field when encoding. Version may not be empty - use the
+// APIVersionInternal constant if you have a type that does not have a formal version.
+/*
+	译：AddKnownTypes将“types”中传递的所有类型注册为版本“version”的成员。
+		传递给“types”的所有对象都应该是指向结构体的指针。
+		编码时，该结构的名称为“kind”字段。
+		版本可能不为空 - 如果您使用一个不具有正式版本的“type”，请使用APIVersionInternal常量。
+*/
+func (s *Scheme) AddKnownTypes(gv unversioned.GroupVersion, types ...Object) {
+	/*
+		func (s *Scheme) AddKnownTypes 主要操作了s.gvkToType和s.typeToGVK，用于转换的目的。
+	*/
+	if len(gv.Version) == 0 {
+		panic(fmt.Sprintf("version is required on all types: %s %v", gv, types[0]))
+	}
+	for _, obj := range types {
+		t := reflect.TypeOf(obj)
+		if t.Kind() != reflect.Ptr {
+			panic("All types must be pointers to structs.")
+		}
+		//Elem()能对指针进行解引用
+		t = t.Elem()
+		if t.Kind() != reflect.Struct {
+			panic("All types must be pointers to structs.")
+		}
+
+		/*
+			gv:group+version
+			gvk:gv+kind,kind就是“types”
+			==>定义在/pkg/api/unversioned/group_version.go
+		*/
+		gvk := gv.WithKind(t.Name())
+		//一个GVK只能对应一个type
+		s.gvkToType[gvk] = t
+		/*
+			t, gvk:  v1.Event /v1, Kind=Event
+			同一个type，可能对应多个gvk
+		*/
+		s.typeToGVK[t] = append(s.typeToGVK[t], gvk)
+	}
+}
+```
+
+## 
+
+## 总结
