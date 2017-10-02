@@ -306,7 +306,7 @@ var (
 ```
 分析基本和前面internal version的一样的，只是多了几个函数接口而已，然后类型定义的文件位置也不一样。
 
-addConversionFuncs, addFastPathConversionFuncs这两个应该是转换函数。
+addConversionFuncs, addFastPathConversionFuncs这两个是转换函数。
 ```go
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {

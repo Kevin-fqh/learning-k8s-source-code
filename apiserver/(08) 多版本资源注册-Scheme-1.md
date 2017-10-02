@@ -39,7 +39,7 @@ var Scheme = runtime.NewScheme()
 ```
 
 ## Scheme的定义
-首先查看对Scheme的介绍，
+首先查看对Scheme的介绍，这里是不是可以把Type和Kind视为等同的？？？
 ```go
 // Scheme defines methods for serializing and deserializing API objects, a type
 // registry for converting group, version, and kind information to and from Go

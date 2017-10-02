@@ -1613,29 +1613,6 @@
 						},
 						{
 							"_type": "UMLTextView",
-							"_id": "AAAAAAFex3IFInWkvEw=",
-							"_parent": {
-								"$ref": "AAAAAAFF+qBtyKM79qY="
-							},
-							"visible": true,
-							"enabled": true,
-							"lineColor": "#000000",
-							"fillColor": "#1b0202",
-							"fontColor": "#000000",
-							"font": "Arial;13;0",
-							"showShadow": true,
-							"containerChangeable": false,
-							"containerExtending": false,
-							"left": 520,
-							"top": 224,
-							"width": 161,
-							"height": 25,
-							"autoResize": false,
-							"text": "Group: API所在的Group",
-							"wordWrap": true
-						},
-						{
-							"_type": "UMLTextView",
 							"_id": "AAAAAAFex3I0THWl2B8=",
 							"_parent": {
 								"$ref": "AAAAAAFF+qBtyKM79qY="

@@ -369,7 +369,7 @@ reousrce = unversioned.APIResource{
 	}
 ```
 
-- Kind
+- Kind  
 那么可以得出，Kind就是定义在`/kubernetes-1.5.2/pkg/api/types.go`中的各种结构体，这里的`/kubernetes-1.5.2/pkg/api/types.go`的数据结构都是internal version的对象。如
 ```go
 type Pod struct
@@ -388,7 +388,7 @@ Group="core"
 Version=v1
 ```
 
-- 小结
+- 小结  
 至此，Group、Version、Kind、Resource就已经清楚了。而GroupVersionKind、GroupVersionResource、GroupKind无非就是某个Group的某个Version中的Kind、Resource。
 
 注意是某个Group 的一个Version，而不是某个Version的一个Group。
