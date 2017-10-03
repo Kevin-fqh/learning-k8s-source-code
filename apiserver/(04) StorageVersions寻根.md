@@ -409,7 +409,7 @@ RESTMapping包含以RESTful方式处理一个特定的resource and kind的对象
 
 	那么RESTMapping怎么用呢？
 	比如/pkg/apiserver/api_installer.go中就有使用到RESTMapping中的Scope用来生成合适的URL(RESTScopeNameRoot和RESTScopeNameNamespace处理不同)。
-	再比如/pkg/kubectl/resource_printer.go中的VersionedPrinter中的converter也是来自RESTMapping中的Convertor(以后和Scheme一起分析)。
+	再比如/pkg/kubectl/resource_printer.go中的VersionedPrinter中的converter也是来自RESTMapping中的Convertor(和Scheme相关)。
 */
 type RESTMapping struct {
 	// Resource is a string representing the name of this resource as a REST client would see it
@@ -432,7 +432,7 @@ RESTScope用于标识某个资源是处于Namespace下，还是全局资源(没�
 const (
 	/*
 		RESTScopeNamespace表明该资源是在Namespace下的，如pods，rc等；
-		RESTScopeRoot标明资源是全局的，如nodes, pv等。
+		RESTScopeRoot标明资源是全局的，如nodes, pv，namespace，ComponentStatus。
 	*/
 	RESTScopeNameNamespace RESTScopeName = "namespace"
 	RESTScopeNameRoot      RESTScopeName = "root"
