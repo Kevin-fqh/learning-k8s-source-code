@@ -12,7 +12,7 @@
 	- [IsAllowedVersion](#isallowedversion)
 	- [IsEnabledVersion](#isenabledversion)
 	- [EnabledVersionsForGroup](#enabledversionsforgroup)
-	- [Group](#Group)
+	- [Group](#group)
 	- [其它，AddThirdPartyAPIGroupVersions](#其它，addthirdpartyapigroupversions)
 	- [RESTMapper](#restmapper)
 	- [AllPreferredGroupVersions](#allpreferredgroupversions)
