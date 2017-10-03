@@ -482,6 +482,9 @@ func Run(s *options.ServerRunOptions) error {
 
 	/*
 		存储组版本
+		调用定义在/pkg/genericapiserver/options/server_run_options.go
+			==>func (s *ServerRunOptions) StorageGroupsToEncodingVersion()
+		获取从group name 到 group version的映射
 	*/
 	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
 	glog.V(0).Infof("storageGroupsToEncodingVersion is %s", storageGroupsToEncodingVersion)
@@ -744,6 +747,8 @@ func Run(s *options.ServerRunOptions) error {
 	sharedInformers.Start(wait.NeverStop)
 	/*
 		运行HTTP/HTTPS服务
+		/pkg/genericapiserver/genericapiserver.go
+			==>func (s preparedGenericAPIServer) Run(stopCh <-chan struct{})
 	*/
 	m.GenericAPIServer.PrepareRun().Run(wait.NeverStop)
 	return nil
