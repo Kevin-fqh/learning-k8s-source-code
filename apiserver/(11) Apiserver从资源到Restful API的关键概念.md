@@ -58,16 +58,13 @@ type RESTMapper interface {
 ```
 
 ## type GroupMeta struct
+type GroupMeta struct主要包括Group的元信息。
+其成员RESTMapper，与APIGroupVersion一样，
+其实APIGroupVersion的RESTMapper直接取值于GroupMeta的RESTMapper。
+一个Group可能包含多个版本，存储在GroupVersions中，
+而GroupVersion是默认存储在etcd中的版本。
 ```go
 // GroupMeta stores the metadata of a group.
-/*
-	type GroupMeta struct 简介：
-	主要包括Group的元信息，
-	里面的成员RESTMapper，与APIGroupVersion一样，
-	其实APIGroupVersion的RESTMapper直接取值于GroupMeta的RESTMapper.
-	一个Group可能包含多个版本，存储在 GroupVersions 中，
-	而 GroupVersion 是默认存储在etcd中的版本。
-*/
 type GroupMeta struct {
 	// GroupVersion represents the preferred version of the group.
 	// 该group的默认版本
@@ -260,7 +257,7 @@ type APIRegistrationManager struct {
 }
 ```
 
-这上面的数据都是通过init()函数来初始化完成的。
+这上面的数据都是通过package 的init()函数来初始化完成的，即它们在main函数执行前已经完成。
 ***
 这下面的数据都是在New一个master的过程中生成的。
 

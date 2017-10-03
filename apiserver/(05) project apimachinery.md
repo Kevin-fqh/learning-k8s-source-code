@@ -51,7 +51,7 @@ pkg/apimachinery/registered	Package to keep track of API Versions that can be re
 ```
 
 ## project apimachinery中各个package的作用
-先来个总体的概念，后面才好更好地渐入佳境。根据整理得出。
+先来个总体的概念，后面才好更好地深入了解。
 ```
 pkg/api/errors	提供了api字段验证的详细错误类型。－Package errors provides detailed error types for api field validation.
 
