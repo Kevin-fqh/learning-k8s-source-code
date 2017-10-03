@@ -41,24 +41,18 @@
 ```
 
 ## newRESTMapper函数
+根据有无namespace，所有的api资源分为两类：
+- RESTScopeNamespace,有namespace
+- RESTScopeRoot,没有namespace,是API最顶层的对象
 ```go
-/*
-	所有的api资源可以分为两类：一类是有namespace，另一类是没有namespace。
-	比如下面func newRESTMapper方法中的Node、Namespace、PersistentVolume、ComponentStatus不属于任何namespace。
-	ignoredKinds是下面接口需要用到的参数，表示遍历Scheme时忽略这些kinds。
-*/
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	fmt.Println("调用func newRESTMapper")
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	/*
 		译：在api层次结构根目录下的种类列表，如果没有在这里列出，则假定它具有命名空间范围
-
-		这些枚举列出的是API最顶层的对象，可以理解为没有namespace的对象
-		根据有无namespace，对象分为两类：
-								RESTScopeNamespace
-								RESTScopeRoot
 	*/
+	//rootScoped枚举列出的是API最顶层的对象，可以理解为没有namespace的对象。
 	rootScoped := sets.NewString(
 		"Node",
 		"Namespace",
@@ -68,7 +62,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 
 	// these kinds should be excluded from the list of resources
 	/*
-		需要忽略Scheme中如下的kinds
+		ignoredKinds是下面接口需要用到的参数，表示遍历Scheme时忽略这些kinds。
 	*/
 	ignoredKinds := sets.NewString(
 		"ListOptions",
