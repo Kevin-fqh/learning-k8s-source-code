@@ -64,6 +64,17 @@ core v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pk
 	GroupMeta有啥作用呢？主要用于初始化APIGroupVersion。
 ```
 
+## API资源注册为Restful API
+当API资源初始化完成以后，需要将这些API资源注册为restful api，用来接收用户的请求。
+kube-apiServer使用了go-restful这套框架，里面主要包括三种对象：
+- Container: 一个Container包含多个WebService
+- WebService: 一个WebService包含多条route
+- Route: 一条route包含一个method(GET、POST、DELETE等)，一条具体的path(URL)以及一个响应的handler function。
+
+API注册的入口函数有两个： m.InstallAPIs 和 m.InstallLegacyAPI。
+文件路径：pkg/master/master.go
+这两个函数分别用于注册"/api"和"/apis"的API,这里先拿InstallLegacyAPI进行介绍。
+这些接口都是在config.Complete().New()函数中被调用
 
 ## 参考
 [如何扩展Kubernetes管理的资源对象](http://dockone.io/article/2405)

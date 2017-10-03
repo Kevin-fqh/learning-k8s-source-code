@@ -260,6 +260,10 @@ type APIRegistrationManager struct {
 }
 ```
 
+这上面的数据都是通过init()函数来初始化完成的。
+***
+这下面的数据都是在New一个master的过程中生成的。
+
 ## type APIGroupInfo struct
 基于GroupMeta和Scheme来初始化一个genericapiserver.APIGroupInfo。见/pkg/genericapiserver/genericapiserver.go
 
@@ -405,6 +409,8 @@ type APIGroupVersion struct {
 }
 ```
 
+
+***
 最后`apiGroupVersion.InstallREST(s.HandlerContainer.Container)`，完成从API资源到restful API的注册。
 
 
