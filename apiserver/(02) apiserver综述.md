@@ -34,11 +34,11 @@ core v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pk
 
 2. GroupMeta包含成员其中就有Groupversion、RESTMapper。初始化groupMeta的时候会根据Scheme和externalVersions新建一个RESTMapper。
 
-3. /pkg/registry/core/rest/storage_core.go中的NewLegacyRESTStorage基于上面的Scheme和GroupMeta生成了一个APIGroupInfo。
+3. /pkg/registry/core/rest/storage_core.go中的NewLegacyRESTStorage基于上面的Scheme和GroupMeta生成了一个APIGroupInfo。初始化时候的GroupMeta是通过type APIRegistrationManager struct的函数来获取的。
 
 4. 然后基于APIGroupInfo生成一个APIGroupVersion。
 
-5. 然后基于APIGroupVersion生成一个master。
+5. 最后`apiGroupVersion.InstallREST(s.HandlerContainer.Container)`，完成从API资源到restful API的注册。
 
 ```go
 重要结构体:

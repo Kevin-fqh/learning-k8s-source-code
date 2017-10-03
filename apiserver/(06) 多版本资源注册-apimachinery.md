@@ -555,6 +555,10 @@ func (m *APIRegistrationManager) InterfacesFor(version unversioned.GroupVersion)
 /*
 	获取一个group对应的GroupMeta。
 	本接口后面会被abandon掉
+	
+	会在后面初始化创建一个APIGroupInfo的时候被使用
+		==>/pkg/registry/core/rest/storage_core.go
+			==>func (c LegacyRESTStorageProvider) NewLegacyRESTStorage
 */
 func (m *APIRegistrationManager) GroupOrDie(group string) *apimachinery.GroupMeta {
 	groupMeta, found := m.groupMetaMap[group]
