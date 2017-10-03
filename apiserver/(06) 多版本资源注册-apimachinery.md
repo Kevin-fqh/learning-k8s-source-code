@@ -5,6 +5,17 @@
   - [引子](#引子)
   - [type GroupMeta struct](#type-groupmeta-struct)
   - [type APIRegistrationManager struct](#type-apiregistrationmanager-struct)
+    - [NewAPIRegistrationManager](#newapiregistrationmanager)
+	- [RegisterVersions](#registerversions)
+	- [RegisterGroup](#registergroup)
+	- [EnableVersions](#enableversions)
+	- [IsAllowedVersion](#isallowedversion)
+	- [IsEnabledVersion](#isenabledversion)
+	- [EnabledVersionsForGroup](#enabledversionsforgroup)
+	- [Group](#Group)
+	- [其它，AddThirdPartyAPIGroupVersions](#其它，addthirdpartyapigroupversions)
+	- [RESTMapper](#restmapper)
+	- [AllPreferredGroupVersions](#allpreferredgroupversions)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -218,7 +229,8 @@ type APIRegistrationManager struct {
 
 下面开始分析type APIRegistrationManager struct实现的函数功能，这里只是把其所有函数函数功能进行列表性介绍，不涉及调用等逻辑关系。
 
-* New一个APIRegistrationManager对象
+### NewAPIRegistrationManager
+New一个APIRegistrationManager对象
 ```
 /*
 	包级变量，
@@ -284,7 +296,7 @@ func NewAPIRegistrationManager(kubeAPIVersions string) (*APIRegistrationManager,
 	return m, nil
 }
 ```
-* RegisterVersions  
+### RegisterVersions  
 向APIRegistrationManager注册GroupVersion
 ```go
 // RegisterVersions adds the given group versions to the list of registered group versions.
@@ -299,7 +311,7 @@ func (m *APIRegistrationManager) RegisterVersions(availableVersions []unversione
 }
 ```
 
-* RegisterGroup  
+### RegisterGroup  
 向APIRegistrationManager注册groupMeta
 ```go
 // RegisterGroup adds the given group to the list of registered groups.
@@ -323,7 +335,7 @@ func (m *APIRegistrationManager) RegisterGroup(groupMeta apimachinery.GroupMeta)
 }
 ```
 
-* EnableVersions  
+### EnableVersions  
 设置一个GroupVersion为enable，激活它
 ```go
 // EnableVersions adds the versions for the given group to the list of enabled versions.
@@ -349,7 +361,7 @@ func (m *APIRegistrationManager) EnableVersions(versions ...unversioned.GroupVer
 }
 ```
 
-* IsAllowedVersion
+### IsAllowedVersion
 ```go
 // IsAllowedVersion returns if the version is allowed by the KUBE_API_VERSIONS
 // environment variable. If the environment variable is empty, then it always
@@ -371,7 +383,7 @@ func (m *APIRegistrationManager) IsAllowedVersion(v unversioned.GroupVersion) bo
 }
 ```
 
-* IsEnabledVersion
+### IsEnabledVersion
 ```go
 // IsEnabledVersion returns if a version is enabled.
 func (m *APIRegistrationManager) IsEnabledVersion(v unversioned.GroupVersion) bool {
@@ -380,7 +392,7 @@ func (m *APIRegistrationManager) IsEnabledVersion(v unversioned.GroupVersion) bo
 }
 ```
 
-* EnabledVersions
+### EnabledVersions
 ```go
 // EnabledVersions returns all enabled versions.  Groups are randomly ordered, but versions within groups
 // are priority order from best to worst
@@ -401,7 +413,7 @@ func (m *APIRegistrationManager) EnabledVersions() []unversioned.GroupVersion {
 }
 ```
 
-* EnabledVersionsForGroup
+### EnabledVersionsForGroup
 ```go
 // EnabledVersionsForGroup returns all enabled versions for a group in order of best to worst
 /*
@@ -423,7 +435,7 @@ func (m *APIRegistrationManager) EnabledVersionsForGroup(group string) []unversi
 }
 ```
 
-* Group
+### Group
 ```go
 // Group returns the metadata of a group if the group is registered, otherwise
 // an error is returned.
@@ -441,7 +453,7 @@ func (m *APIRegistrationManager) Group(group string) (*apimachinery.GroupMeta, e
 ```
 
 太多了，一次性贴出来，其中有一个和第三方Groupversion相关的，比较重要，可以通过它来实现用户自主添加API资源。
-* 其它
+### 其它，AddThirdPartyAPIGroupVersions
 ```go
 // IsRegistered takes a string and determines if it's one of the registered groups
 /*
@@ -559,7 +571,7 @@ func (m *APIRegistrationManager) GroupOrDie(group string) *apimachinery.GroupMet
 ```
 
 然后还有一个`func (m *APIRegistrationManager) RESTMapper`很重要。
-* RESTMapper
+### RESTMapper
 ```go
 /*
 	func (m *APIRegistrationManager) RESTMapper返回一个RESTMapper聚合体，按下面的顺序进行最优排列:
@@ -656,7 +668,7 @@ func (m *APIRegistrationManager) prioritiesForGroups(groups ...string) ([]unvers
 }
 ```
 
-* AllPreferredGroupVersions
+### AllPreferredGroupVersions
 AllPreferredGroupVersions，在前面[StorageVersions寻根]()提到过。
 Apiserver通过它来获取所有Group的首选version。
 ```go
