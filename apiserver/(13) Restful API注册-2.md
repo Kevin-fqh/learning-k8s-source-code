@@ -285,7 +285,7 @@ type LegacyRESTStorage struct {
 }
 ```
 
-## 基于上面的生成的APIGroupInfo信息调用GenericAPIServer.InstallLegacyAPIGroup
+## 基于APIGroupInfo调用InstallLegacyAPIGroup
 ```go
 func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	// 判断前缀参数是否正确
