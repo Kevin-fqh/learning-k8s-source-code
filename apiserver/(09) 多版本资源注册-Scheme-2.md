@@ -49,6 +49,8 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 		这样看上去好像多此一举？
 		其实这就是k8s对api多版本的支持，这样用户可以以一个v1beta1创建一个Pod,
 		然后存入etcd的是一个相对稳定的版本，比如v1版本。
+		
+		转换必定存在着效率的问题，为了解决效率问题，转换函数由开发者自己写，然后会重新用代码生成一次，进行优化。
 	*/
 	if err := api.AddToScheme(api.Scheme); err != nil {
 		// Programmer error, detect immediately

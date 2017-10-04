@@ -57,6 +57,66 @@ type RESTMapper interface {
 }
 ```
 
+## type DefaultRESTMapper struct
+用于暴露定义在runtime.Scheme中的那些“types”的映射关系。
+实现了/pkg/meta/interfaces.go中type RESTMapper interface。
+
+`type DefaultRESTMapper struct`用于管理所有对象的信息。
+- 外部要获取的话，直接通过version,group获取到RESTMapper，
+- 然后通过kind类型可以获取到对应的信息。
+- groupMeta中的RESTMapper就是实现了一个DefaultRESTMapper结构。
+- DefaultRESTMapper中的resource是指GVR，kind是指GVK
+- singular和Plural都是GVR
+
+```go
+// DefaultRESTMapper exposes mappings between the types defined in a
+// runtime.Scheme. It assumes that all types defined the provided scheme
+// can be mapped with the provided MetadataAccessor and Codec interfaces.
+//
+// The resource name of a Kind is defined as the lowercase,
+// English-plural version of the Kind string.
+// When converting from resource to Kind, the singular version of the
+// resource name is also accepted for convenience.
+//
+/*
+译：DefaultRESTMapper 用于暴露定义在runtime.Scheme中的那些“types”的映射关系。
+   它假设定义在 指定的Scheme 中的所有“types”，都可以使用指定的MetadataAccessor和Codec接口进行映射。
+
+   一个Kind应该是单数的驼峰式，如Pod
+   一个Kind的resource name 被定义为一个 小写的、复数的Kind字符串。如pods
+   从resource转换为Kind时，为方便起见，也可以使用resource name的单数版本。
+*/
+// TODO: Only accept plural for some operations for increased control?
+// (`get pod bar` vs `get pods bar`)
+
+type DefaultRESTMapper struct {
+	/*
+		RESTMapper包含的是一种转换关系，
+		resource到kind，kind到resource，kind到scope的转换。
+		resource还分单数和复数(plural, singular)。
+
+		kind和resource有什么区别呢？
+		二者都是字符串，kind是通过Kind=reflector.TypeOf(&Pod{}).Elem().Name()进行取值，取得的就是Pod这个结构体的名字。
+		             resource是通过plural, singular := KindToResource(kind)取值。
+		singular是将Kind转换为小写字母，而plural是变为复数。
+
+		Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
+	*/
+	defaultGroupVersions []unversioned.GroupVersion
+
+	resourceToKind       map[unversioned.GroupVersionResource]unversioned.GroupVersionKind
+	kindToPluralResource map[unversioned.GroupVersionKind]unversioned.GroupVersionResource
+	kindToScope          map[unversioned.GroupVersionKind]RESTScope
+	singularToPlural     map[unversioned.GroupVersionResource]unversioned.GroupVersionResource
+	pluralToSingular     map[unversioned.GroupVersionResource]unversioned.GroupVersionResource
+
+	interfacesFunc VersionInterfacesFunc
+
+	// aliasToResource is used for mapping aliases to resources
+	aliasToResource map[string][]string
+}
+```
+
 ## type GroupMeta struct
 type GroupMeta struct主要包括Group的元信息。
 其成员RESTMapper，与APIGroupVersion一样，
@@ -261,6 +321,100 @@ type APIRegistrationManager struct {
 ***
 这下面的数据都是在New一个master的过程中生成的。
 
+## type Master struct
+```go
+// Master contains state for a Kubernetes cluster master/api server.
+type Master struct {
+	GenericAPIServer *genericapiserver.GenericAPIServer
+}
+```
+
+## type GenericAPIServer struct
+构建master的必备成员，见/pkg/genericapiserver/genericapiserver.go。和注册成为Restful API有关系。
+```go
+// GenericAPIServer contains state for a Kubernetes cluster api server.
+//GenericAPIServer包含Kubernetes集群api服务器的状态
+type GenericAPIServer struct {
+	// discoveryAddresses is used to build cluster IPs for discovery.
+	discoveryAddresses DiscoveryAddresses
+
+	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
+	LoopbackClientConfig *restclient.Config
+
+	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
+	minRequestTimeout time.Duration
+
+	// enableSwaggerSupport indicates that swagger should be served.  This is currently separate because
+	// the API group routes are created *after* initialization and you can't generate the swagger routes until
+	// after those are available.
+	// TODO eventually we should be able to factor this out to take place during initialization.
+	enableSwaggerSupport bool
+
+	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
+	// to InstallLegacyAPIGroup
+	/*
+		legacyAPIGroupPrefixes用于设置URL解析，以进行授权和验证对InstallLegacyAPIGroup的请求
+	*/
+	legacyAPIGroupPrefixes sets.String
+
+	// admissionControl is used to build the RESTStorage that backs an API Group.
+	admissionControl admission.Interface
+
+	// requestContextMapper provides a way to get the context for a request.  It may be nil.
+	requestContextMapper api.RequestContextMapper
+
+	// The registered APIs
+	/*
+		这个*genericmux.APIContainer是 go-restful框架中的container的封装，用来装载webservice之用
+		定义在pkg/genericapiserver/mux/container.go
+	*/
+	HandlerContainer *genericmux.APIContainer
+
+	SecureServingInfo   *SecureServingInfo
+	InsecureServingInfo *ServingInfo
+
+	// numerical ports, set after listening
+	effectiveSecurePort, effectiveInsecurePort int
+
+	// ExternalAddress is the address (hostname or IP and port) that should be used in
+	// external (public internet) URLs for this GenericAPIServer.
+	ExternalAddress string
+
+	// storage contains the RESTful endpoints exposed by this GenericAPIServer
+	storage map[string]rest.Storage
+
+	// Serializer controls how common API objects not in a group/version prefix are serialized for this server.
+	// Individual APIGroups may define their own serializers.
+	Serializer runtime.NegotiatedSerializer
+
+	// "Outputs"
+	Handler         http.Handler
+	InsecureHandler http.Handler
+
+	// Map storing information about all groups to be exposed in discovery response.
+	// The map is from name to the group.
+	apiGroupsForDiscoveryLock sync.RWMutex
+	apiGroupsForDiscovery     map[string]unversioned.APIGroup
+
+	// See Config.$name for documentation of these flags
+
+	enableOpenAPISupport bool
+	openAPIConfig        *common.Config
+
+	// PostStartHooks are each called after the server has started listening, in a separate go func for each
+	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
+	// It may kill the process with a panic if it wishes to by returning an error
+	postStartHookLock    sync.Mutex
+	postStartHooks       map[string]postStartHookEntry
+	postStartHooksCalled bool
+
+	// healthz checks
+	healthzLock    sync.Mutex
+	healthzChecks  []healthz.HealthzChecker
+	healthzCreated bool
+}
+```
+
 ## type APIGroupInfo struct
 基于GroupMeta和Scheme来初始化一个genericapiserver.APIGroupInfo。见/pkg/genericapiserver/genericapiserver.go
 
@@ -274,7 +428,11 @@ type APIGroupInfo struct {
 	*/
 	GroupMeta apimachinery.GroupMeta
 	// Info about the resources in this group. Its a map from version to resource to the storage.
-	// 不同版本的所有的Storage
+	/*
+		在这个Group中所有resources的信息
+		这是一个API的映射表，从version->resource->资源的rest storage实现
+		比如在/pkg/registry/core/rest/storage_core.go中func (c LegacyRESTStorageProvider) NewLegacyRESTStorage
+	*/
 	VersionedResourcesStorageMap map[string]map[string]rest.Storage
 	// OptionsExternalVersion controls the APIVersion used for common objects in the
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may

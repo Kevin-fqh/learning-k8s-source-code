@@ -63,7 +63,7 @@ core v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pk
 	综合上面所有的初始化可以看到（APIGroupVersion、APIGroupInfo、Scheme、GroupMeta、RESTMapper、APIRegistrationManager），
 	其实主要用internal version和external versions填充Scheme，
 	用external versions去填充GroupMeta以及其成员RESTMapper。
-	GroupMeta有啥作用呢？主要用于初始化APIGroupVersion。
+	GroupMeta有啥作用呢？主要用于生成最后的APIGroupVersion。
 ```
 
 ## API资源注册为Restful API

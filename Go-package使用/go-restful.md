@@ -1,6 +1,6 @@
 # go-restful
 
-简单介绍[package sort](https://godoc.org/github.com/emicklei/go-restful)的用法。
+简单介绍[package go-restful](https://godoc.org/github.com/emicklei/go-restful)的用法。
 构建REST-style WebServices的一个第三方包
 
 本文摘抄于[apiServer之go-restful的使用](http://dockone.io/article/2171)
@@ -11,7 +11,9 @@
 
 CurlyRouter支持正则表达式和动态参数，相比RouterJSR11更加轻量级，apiserver中使用的就是这种路由。
 
-一种Route的设定包含：请求方法(http Method)，请求路径(URL Path),输入输出类型(JSON/YAML)以及对应的回掉函数restful.RouteFunction，响应内容类型(Accept)等。
+A Route is defined by a HTTP method, an URL path and (optionally) the MIME types it consumes (Content-Type) and produces (Accept). 
+Route binds a HTTP Method,Path,Consumes combination to a RouteFunction.
+其中请求方法(http Method)，请求路径(URL Path),输入输出类型(JSON/YAML)，响应内容类型(Accept)。
 
 ### WebService
 WebService逻辑上是Route的集合，功能上主要是为一组Route统一设置包括root path,请求响应的数据类型等一些通用的属性。
@@ -37,17 +39,23 @@ import (
 func main() {
 ws := new(restful.WebService)
 ws.Route(ws.GET("/hello").To(hello))
-// ws被添加到默认的container restful.DefaultContainer中
+/*
+	ws被添加到默认的container restful.DefaultContainer中
+	DefaultContainer is a restful.Container that uses http.DefaultServeMux
+*/
 restful.Add(ws)
 go func() {
     // restful.DefaultContainer监听在端口8080上
     http.ListenAndServe(":8080", nil)
 }()
 
+/*
+	NewContainer creates a new Container using a new ServeMux and default router (CurlyRouter)
+*/
 container2 := restful.NewContainer()
 ws2 := new(restful.WebService)
 ws2.Route(ws2.GET("/hello").To(hello2))
-// ws2被添加到container2中
+//WebService ws2被添加到container2中
 container2.Add(ws2)
 // container2中监听端口8081
 server := &http.Server{Addr: ":8081", Handler: container2}
@@ -185,7 +193,7 @@ func main() {
 // 创建一个空的Container
 wsContainer := restful.NewContainer()
 
-// 设定路由为CurlyRouter(快速路由)
+// 设定路由为CurlyRouter(快速路由)，这个也是默认值
 wsContainer.Router(restful.CurlyRouter{})
 
 // 创建自定义的Resource Handle(此处为UserResource)

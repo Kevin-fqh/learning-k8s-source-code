@@ -494,6 +494,9 @@ func Run(s *options.ServerRunOptions) error {
 	/*
 		创建api工厂，包括请求头、解析工具、编码格式、API配置
 		创建了一个DefaultStorageFactory对象
+		==>/pkg/genericapiserver/default_storage_factory_builder.go
+			==>func BuildDefaultStorageFactory
+		etcd存储的资源前缀也在这里设置
 	*/
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
 		s.GenericServerRunOptions.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
@@ -758,17 +761,14 @@ func Run(s *options.ServerRunOptions) error {
 
 ## New一个master
 那么重点就来到了这个master对象是怎么样的？见pkg/master/master.go。
+
+func (c completedConfig) New() 基于给定的配置生成一个新的Master实例。如果未设置，某些配置字段将被设置为默认值。某些字段是必须指定的，比如：KubeletClientConfig
 ```go
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClientConfig
-/*
-	译：func (c completedConfig) New()
-		从给定的配置返回一个新的Master实例。
-		如果未设置，某些配置字段将被设置为默认值。
-		必须指定某些配置字段，包括：KubeletClientConfig
-*/
+
 func (c completedConfig) New() (*Master, error) {
 	if reflect.DeepEqual(c.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
@@ -917,10 +917,11 @@ func (c completedConfig) New() (*Master, error) {
 至此，apiserver就已经run起来了，可以对外提供服务了。
 
 ## 总结
-本文主要走览了apiserver的参数设置，在run apiserver过程中以插件的形式启动认证、授权等模块。
+本文主要阅读了apiserver的参数设置，在run apiserver过程中以插件的形式启动认证、授权等模块。
 最后，new一个master对象，通过master对象来完成路由的注册。
 
 后面要讲解的内容包括
 - k8s里面最顶层的概念设计：`group、restmapper、scheme...`这些概念
 - api路由是怎么生成和管理的
 - apiserver的多版本API管理机制
+- 对go-restful package的使用
