@@ -1,6 +1,23 @@
 # Apiserver Restful API注册-2
 
-我们接着上文，从函数`func (m *Master) InstallLegacyAPI`出发，研究core Group的资源是怎么注册成为API的？
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [注册核心Group-InstallLegacyAPI](#注册核心group-installlegacyapi)
+  - [type LegacyRESTStorageProvider struct](#type-legacyreststorageprovider-struct)
+	- [NewLegacyRESTStorage](#newlegacyreststorage)
+  - [InstallLegacyAPIGroup，使用APIGroupInfo](#installlegacyapigroup，使用apigroupinfo)
+  - [installAPIResources](#installapiresources)
+  - [创建APIGroupVersion](#创建apigroupversion)
+  - [InstallREST安装restful API](#installrest安装restful-api)
+  - [type APIInstaller struct](#type-apiinstaller-struct)
+	- [NewWebService](#newwebservice)
+	- [Install](#install)
+	- [registerResourceHandlers](#registerresourcehandlers)
+  - [总结](#总结)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+我们接着上文，从函数`func (m *Master) InstallLegacyAPI`出发，研究各个Group的资源是怎么注册成为API的？
 见/pkg/master/master.go
 ## 注册核心Group-InstallLegacyAPI
 InstallLegacyAPI函数流程并不复杂，一共有3步：
@@ -74,7 +91,7 @@ k8s.io/kubernetes/pkg/registry/
 1. 生成一个type APIGroupInfo struct实例，这个和前面说的资源注册的`APIRegistrationManager、Scheme、GroupMeta...`有关系。
 2. 初始化一个LegacyRESTStorage对象，即restStorage
 3. 创建各类Storage，如podStorage、nodeStorage...(还搞不清和步骤2中restStorage的关系。。？？)
-4. 把步骤3中创建的各种Storage保存到restStorageMap中，然后装在到APIGroupInfo中，APIGroupInfo.VersionedResourcesStorageMap["v1"]。这是API映射map。
+4. 把步骤3中创建的各种Storage保存到restStorageMap中，然后装在到APIGroupInfo中，APIGroupInfo.VersionedResourcesStorageMap["v1"]。这是API映射map，这很重要，在后面的利用APIGroupInfo来生成APIGroupVersion的时候，就是依靠这个map映射关系来获取对应version的资源的rest strorage实现。
 5. return restStorage, APIGroupInfo
 ```go
 func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter genericapiserver.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
@@ -261,7 +278,14 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "policy", Version: "v1beta1"}) {
 		restStorageMap["pods/eviction"] = podStorage.Eviction
 	}
-	// 将上面的restStorageMap赋值给v1，装载到了apiGroupInfo
+	/*
+		将上面的restStorageMap赋值给v1，装载到了apiGroupInfo
+
+		这映射关系很重要，在后面的利用APIGroupInfo来生成APIGroupVersion的时候，
+		就是依靠这个map映射关系来获取对应version的资源的rest strorage实现。
+			==>/pkg/genericapiserver/genericapiserver.go
+				==>func (s *GenericAPIServer) getAPIGroupVersion
+	*/
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap
 
 	return restStorage, apiGroupInfo, nil
@@ -285,7 +309,7 @@ type LegacyRESTStorage struct {
 }
 ```
 
-## 基于APIGroupInfo调用InstallLegacyAPIGroup
+## InstallLegacyAPIGroup，使用APIGroupInfo
 ```go
 func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	// 判断前缀参数是否正确
@@ -390,8 +414,10 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 }
 ```
 
-## 创建APIGroupVersion过程
+## 创建APIGroupVersion
 基于APIGroupInfo生成一个APIGroupVersion。
+
+这里对apiGroupInfo.VersionedResourcesStorageMap进行遍历，和前面设置资源的rest storage存储对应上了。
 - getAPIGroupVersion
 ```go
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
@@ -421,6 +447,7 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	version, err := s.newAPIGroupVersion(apiGroupInfo, groupVersion)
 	// 设置Prefix, 核心组的话是"/api"
 	version.Root = apiPrefix
+	//完成storage的赋值
 	version.Storage = storage
 	return version, err
 }
@@ -473,9 +500,10 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 InstallREST将REST handlers（storage, watch, proxy and redirect）注册到go-restful框架的Container中，见pkg/apiserver/apiserver.go。
 
 分析其流程，如下:
-1. 构造一个webservice，利用了一个type APIInstaller struct对象
-2. 往webservice里面添加Route
-3. 往container中添加webservice
+1. 创建了一个type APIInstaller struct对象
+2. 构造一个webservice
+3. 往webservice里面添加Route
+4. 往container中添加webservice
 
 ```go
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
@@ -498,7 +526,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		然后填充并返回一个APIInstaller对象
 	*/
 	installer := g.newInstaller()
-	// 创建一个WebService
+	// 创建一个WebService，设置了ws的path属性
 	ws := installer.NewWebService()
 	/*
 		*********************************************
@@ -510,11 +538,16 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		并和实际的URL关联起来。
 	*/
 	apiResources, registrationErrors := installer.Install(ws)
+	/*
+		一个list功能的API
+		添加了一个Route，对应路径是"/"
+		访问形如"Prefix/Group/Version"这样的根路径时候，返回该GroupVersion所支持的resources
+	    curl http://192.168.56.101:8080/api/v1
+	*/
 	lister := g.ResourceLister
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	// 增加一个list的API，Route路径是/apis/extensions/v1
 	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
 	// 将该WebService加入到Container
 	container.Add(ws)
@@ -539,7 +572,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 ......
 ```
 
-来看看`type APIInstaller struct`的定义和功能函数，这也是本文的重点。
+再来看看`type APIInstaller struct`的定义和功能函数，这也是本文的重点。
 ## type APIInstaller struct
 ```go
 type APIInstaller struct {
@@ -572,11 +605,14 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 ```
 
 ### NewWebService
-基于APIInstaller对象创建一个webservice
+基于APIInstaller对象创建一个webservice，设置了ws的Path
 ```go
 // NewWebService creates a new restful webservice with the api installer's prefix and version.
 func (a *APIInstaller) NewWebService() *restful.WebService {
 	ws := new(restful.WebService)
+	/*
+		设置了ws的Path
+	*/
 	ws.Path(a.prefix)
 	// a.prefix contains "prefix/group/version"
 	ws.Doc("API at " + a.prefix)
@@ -593,6 +629,12 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 ```
 
 ### Install
+func (a *APIInstaller) Install重点函数，为入参ws设置各种Route，见/pkg/apiserver/api_installer.go。
+
+分析其流程，如下:
+1. 获取一个GroupVersion下所有的paths，排序
+2. 遍历paths，获取每一个path对应资源对应的rest storage，调用registerResourceHandlers
+
 ```go
 // Installs handlers for API resources.
 /*
@@ -631,6 +673,7 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 				podtemplates replicationcontrollers replicationcontrollers/scale
 				replicationcontrollers/status resourcequotas resourcequotas/status
 				secrets serviceaccounts services services/proxy services/status]
+				
 		prefix 是: /apis/apps/v1beta1时
 		paths:  [statefulsets statefulsets/status]
 		......
@@ -644,6 +687,16 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 			最终将一个rest.Storage对象转换成实际的restful api，
 			比如getter、lister等处理函数，并将实际的URL关联起来
 			传入的参数：path，rest.Storage，WebService，Handler
+			
+			一次给一个资源注册Route
+		*/
+		/*
+			假设此时参数如下，进行分析:
+				prefix: /api/v1
+				path: pods
+			那么对应的是定义在/pkg/registry/core/rest/storage_core.go中的
+				==>func (c LegacyRESTStorageProvider) NewLegacyRESTStorage
+						==>"pods":             podStorage.Pod,
 		*/
 		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler)
 		if err != nil {
@@ -662,12 +715,70 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 ```
 
 ### registerResourceHandlers
-这里完成了关键的REST API注册，func (a *APIInstaller) registerResourceHandlers简介：
-1. 首先构建creater、lister、getter、deleter、updater、patcher、watcher，
-2. 其实他们都是storage，只是对应着对etcd的不同操作。
-3. 然后针对所有的action，构建响应的handler，
-4. 创建对应的route,最后把route添加到service里面。这样就完成了api的注册。
+这里完成了关键的REST API注册，分析其流程如下(分析案例prefix: /api/v1 path: pods):
+1. 根据path获取资源，此时resource is:  pods
+2. 根据resource获取restMapping。mapping, err := a.restMapping(resource)
+3. 利用类型断言判断该storage实现了的Interface，获取Creater/Lister...的接口。这里需要注意的一点就是很多公共的接口都是通过&registry.Store来实现的，而不是直接定义在具体的Storage如PodStorage结构体上。
+```
+&registry.Store是公共的Store
+Storage如PodStorage是具体类型的Store，
+很多公共接口都定义在/pkg/registry/generic/registry/store.go中，如Watch
+具体类型的Storage都实现了&registry.Store接口
 
+对于pod而言，/pkg/registry/core/pod/etcd/etcd.go，
+其watch接口来源于/pkg/registry/generic/registry/store.go的
+	==>func (e *Store) Watch(ctx api.Context, options *api.ListOptions)
+
+就pod而言，其对应的podStorage生成是在/pkg/registry/core/rest/storage_core.go
+	==>func (c LegacyRESTStorageProvider) NewLegacyRESTStorage
+		==>podStorage := podetcd.NewStorage
+```
+4. 设置URL的部分参数值
+```go
+	/*
+		func (w *WebService) PathParameter(name, description string) *Parameter
+		设置URL的参数值
+
+		用法:
+		ws.Route(ws.GET("/{user-id}").To(u.findUser))
+		id := request.PathParameter("user-id")
+	*/
+	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
+	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
+```
+5. 给该资源(分两类进行，有无namespace)添加其支持的verb，存储到actions中。这里可以了解一下`type action struct`。
+```go
+// Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
+/*
+	type action struct 定义了一个动作
+	action{ "LIST",
+			"componentstatuses",
+			"[]",
+			{0x4c144e0 {} /api/v1/componentstatuses },
+			false
+		  }
+*/
+type action struct {
+	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", PROXY", etc).
+	Path          string               // The path of the action
+	Params        []*restful.Parameter // List of parameters associated with the action.
+	Namer         ScopeNamer
+	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
+}
+```
+6. 遍历切片actions，注册Route到WebService中
+```
+此时的prefix是:  /api/v1
+**actions length is:*** 1
+actions content is: [{POST namespaces/{namespace}/bindings [0xc420447f60] {0x4c144a0 {} 0x830830 false} false}]
+**actions length is:*** 2
+actions content is: [{LIST componentstatuses [] {0x4c144e0 {} /api/v1/componentstatuses } false} {GET componentstatuses/{name} [0xc420447f90] {0x4c144e0 {} /api/v1/componentstatuses } false}]
+**actions length is:*** 11
+actions content is: [{LIST nodes [] {0x4c144e0 {} /api/v1/nodes } false} {POST nodes [] {0x4c144e0 {} /api/v1/nodes } false} {DELETECOLLECTION nodes [] {0x4c144e0 {} /api/v1/nodes } false} {WATCHLIST watch/nodes [] {0x4c144e0 {} /api/v1/nodes } false} {GET nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PUT nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PATCH nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {DELETE nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {WATCH watch/nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PROXY proxy/nodes/{name}/{path:*} [0xc420024c78 0xc420024c80] {0x4c144e0 {} /api/v1/nodes } false} {PROXY proxy/nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false}]
+```
+
+- func (a *APIInstaller) registerResourceHandlers
+最后来看看`registerResourceHandlers`函数的定义
 ```go
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
 	admit := a.group.Admit
@@ -704,11 +815,18 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, err
 	}
 
+	/*
+		根据resource获取restMapping
+	*/
 	mapping, err := a.restMapping(resource)
 	if err != nil {
 		return nil, err
 	}
 
+	/*
+		根据resource, storage获取GVK
+		有一套规则，并不是简单获取
+	*/
 	fqKindToRegister, err := a.getResourceKind(path, storage)
 	if err != nil {
 		return nil, err
@@ -723,10 +841,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	hasSubresource := len(subresource) > 0
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
+	//该storage支持哪些verbs
 	/*
-		构建creater、lister、deleter、updater、watcher等，其实就是storage
+		rest.Creater、rest.Lister、rest.Getter这些interface
 		==>定义在/pkg/api/rest/rest.go
+
+		利用类型断言，判断该storage是否实现了该interface
 		这里已经得到该资源支持什么动作，true或者false
+
+		这里需要注意的一点就是很多公共的接口都是通过&registry.Store来实现的，
+		而不是直接定义在具体的Storage如PodStorage结构体上。
 
 		类型断言：该storage是否实现了rest.Creater接口，如果实现了，则返回creater，true
 				否则返回false
@@ -743,7 +867,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	patcher, isPatcher := storage.(rest.Patcher)
 	/*
 		对于pod而言，/pkg/registry/core/pod/etcd/etcd.go，
-		其watch接口来源于pkg/registry/generic/registry的
+		其watch接口来源于/pkg/registry/generic/registry/store.go的
 		func (e *Store) Watch(ctx api.Context, options *api.ListOptions)
 
 		就pod而言，其对应的podStorage生成是在/pkg/registry/core/rest/storage_core.go
@@ -873,6 +997,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
 	scope := mapping.Scope
+	/*
+		func (w *WebService) PathParameter(name, description string) *Parameter
+		设置URL的参数值
+
+		用法:
+		ws.Route(ws.GET("/{user-id}").To(u.findUser))
+		id := request.PathParameter("user-id")
+	*/
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 
@@ -891,8 +1023,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Get the list of actions for the given scope.
 	/*
 		k8s资源分为两类：无namespace的RESTScopeNameRoot;
-		有namespace的RESTScopeNameNamespace
-		在对应的path上添加各类actions，并指定对应的handler。
+					  有namespace的RESTScopeNameNamespace
+
+		在对应的path上添加各类action，存储到切片actions中
+		actions记录着一个资源支持哪些verb，及其访问路径
 	*/
 	switch scope.Name() {
 	case meta.RESTScopeNameRoot:
@@ -1033,7 +1167,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, fmt.Errorf("unsupported restscope: %s", scope.Name())
 	}
 
+	/*************************/
 	/**为上面的action创建路由**/
+	/*************************/
 	// Create Routes for the actions.
 	// TODO: Add status documentation using Returns()
 	// Errors (see api/errors/errors.go as well as go-restful router):
@@ -1069,8 +1205,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Kind:        fqKindToRegister,
 	}
 	/*
+		在前面生成actions存储着该资源的所有动作(每次只有一个资源)
+
 		根据之前生成的actions,进行遍历
 		然后在WebService中添加指定的route
+	*/
+	/*
+		此时的prefix是:  /api/v1
+		**actions length is:*** 1
+		actions content is: [{POST namespaces/{namespace}/bindings [0xc420447f60] {0x4c144a0 {} 0x830830 false} false}]
+		**actions length is:*** 2
+		actions content is: [{LIST componentstatuses [] {0x4c144e0 {} /api/v1/componentstatuses } false} {GET componentstatuses/{name} [0xc420447f90] {0x4c144e0 {} /api/v1/componentstatuses } false}]
 	*/
 	for _, action := range actions {
 		versionedObject := storageMeta.ProducesObject(action.Verb)
@@ -1350,3 +1495,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	return &apiResource, nil
 }
 ```
+
+## 总结
+本文主要讲解了如何把所有GroupVersion中定义的资源生成Restful API，主要是根据go－restful的流程。中间穿插着APIGroupVersion、APIGroupInfo、Scheme、GroupMeta、RESTMapper、APIRegistrationManager几个数据结构的使用。搞清楚这几个数据结构的脉络关系，基本就了解这个注册过程。
+
+后续将要讲解里面提到的podStorage是怎么实现？

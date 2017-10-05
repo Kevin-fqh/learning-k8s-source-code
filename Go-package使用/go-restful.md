@@ -217,3 +217,8 @@ log.Fatal(server.ListenAndServe())
 - 创建对应Resource的WebService，在WebService中添加响应Route，并将WebService加入到Container中。
 - 启动监听服务。
 
+通俗来说，三者的关系如下:
+- Container: 一个Container包含多个WebService
+- WebService: 一个WebService包含多条route
+- Route: 一条route包含一个method(GET、POST、DELETE等)，一条具体的path(URL)以及一个响应的handler function。
+
