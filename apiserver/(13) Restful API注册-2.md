@@ -777,7 +777,7 @@ actions content is: [{LIST componentstatuses [] {0x4c144e0 {} /api/v1/components
 actions content is: [{LIST nodes [] {0x4c144e0 {} /api/v1/nodes } false} {POST nodes [] {0x4c144e0 {} /api/v1/nodes } false} {DELETECOLLECTION nodes [] {0x4c144e0 {} /api/v1/nodes } false} {WATCHLIST watch/nodes [] {0x4c144e0 {} /api/v1/nodes } false} {GET nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PUT nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PATCH nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {DELETE nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {WATCH watch/nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PROXY proxy/nodes/{name}/{path:*} [0xc420024c78 0xc420024c80] {0x4c144e0 {} /api/v1/nodes } false} {PROXY proxy/nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false}]
 ```
 
-- func (a *APIInstaller) registerResourceHandlers
+- func (a *APIInstaller) registerResourceHandlers  
 最后来看看`registerResourceHandlers`函数的定义
 ```go
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
