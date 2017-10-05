@@ -42,6 +42,8 @@ core v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pk
 
 5. 最后`apiGroupVersion.InstallREST(s.HandlerContainer.Container)`，完成从API资源到restful API的注册。
 
+6. 在InstallREST的过程中会用到
+
 ```go
 重要结构体:
 一：

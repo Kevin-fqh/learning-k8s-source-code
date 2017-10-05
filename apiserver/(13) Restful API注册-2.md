@@ -347,8 +347,8 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 
 ## installAPIResources
 分析`func (s *GenericAPIServer) installAPIResources`，其流程如下:
-1. 遍历该Group的所有versions（一个Group调用一次本函数，亦即所有Group最后都是调用本函数）
-2. apiGroupInfo, groupVersion, apiPrefix基于创建一个type APIGroupVersion struct对象
+1. 遍历该Group的所有versions（一个Group调用一次本函数，亦即所有Group最后都是调用本函数来安装Restful API）
+2. 基于apiGroupInfo, groupVersion, apiPrefix创建一个type APIGroupVersion struct对象
 3. 根据创建的APIGroupVersion,然后安装restful API，`apiGroupVersion.InstallREST`
 ```go
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
@@ -391,6 +391,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 ```
 
 ## 创建APIGroupVersion过程
+基于APIGroupInfo生成一个APIGroupVersion。
 - getAPIGroupVersion
 ```go
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
@@ -469,13 +470,18 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 ```
 
 ## InstallREST安装restful API
-见pkg/apiserver/apiserver.go
+InstallREST将REST handlers（storage, watch, proxy and redirect）注册到go-restful框架的Container中，见pkg/apiserver/apiserver.go。
+
+分析其流程，如下:
+1. 构造一个webservice，利用了一个type APIInstaller struct对象
+2. 往webservice里面添加Route
+3. 往container中添加webservice
+
 ```go
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
 /*
-	译：InstallREST将REST handlers（storage, watch, proxy and redirect）注册到go-restful框架的Container中。
 		预期的结果是提供的路径root prefix在所有的服务都是生效的，
 		Root不能以 / 结束
 */
@@ -508,10 +514,839 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	if lister == nil {
 		lister = staticLister{apiResources}
 	}
-	// 增加一个list的API
+	// 增加一个list的API，Route路径是/apis/extensions/v1
 	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
 	// 将该WebService加入到Container
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)
+}
+```
+函数中`apiResources, registrationErrors := installer.Install(ws)`得到的`apiResources`部分返回结果如下
+```
+此时的prefix是:  /api/v1
+**apiResources is : [{bindings true Binding} {componentstatuses false ComponentStatus} {configmaps true ConfigMap} {endpoints true Endpoints} {events true Event} {limitranges true LimitRange} {namespaces false Namespace} {namespaces/finalize false Namespace} {namespaces/status false Namespace} {nodes false Node} {nodes/proxy false Node} {nodes/status false Node} {persistentvolumeclaims true PersistentVolumeClaim} {persistentvolumeclaims/status true PersistentVolumeClaim} {persistentvolumes false PersistentVolume} {persistentvolumes/status false PersistentVolume} {pods true Pod} {pods/attach true Pod} {pods/binding true Binding} {pods/eviction true Eviction} {pods/exec true Pod} {pods/log true Pod} {pods/portforward true Pod} {pods/proxy true Pod} {pods/status true Pod} {podtemplates true PodTemplate} {replicationcontrollers true ReplicationController} {replicationcontrollers/scale true Scale} {replicationcontrollers/status true ReplicationController} {resourcequotas true ResourceQuota} {resourcequotas/status true ResourceQuota} {secrets true Secret} {serviceaccounts true ServiceAccount} {services true Service} {services/proxy true Service} {services/status true Service}]
+此时的prefix是:  /apis/apps/v1beta1
+**apiResources is : [{statefulsets true StatefulSet} {statefulsets/status true StatefulSet}]
+此时的prefix是:  /apis/authentication.k8s.io/v1beta1
+**apiResources is : [{tokenreviews false TokenReview}]
+此时的prefix是:  /apis/authorization.k8s.io/v1beta1
+**apiResources is : [{localsubjectaccessreviews true LocalSubjectAccessReview} {selfsubjectaccessreviews false SelfSubjectAccessReview} {subjectaccessreviews false SubjectAccessReview}]
+此时的prefix是:  /apis/autoscaling/v1
+**apiResources is : [{horizontalpodautoscalers true HorizontalPodAutoscaler} {horizontalpodautoscalers/status true HorizontalPodAutoscaler}]
+此时的prefix是:  /apis/batch/v1
+**apiResources is : [{jobs true Job} {jobs/status true Job}]
+......
+......
+```
+
+来看看`type APIInstaller struct`的定义和功能函数，这也是本文的重点。
+## type APIInstaller struct
+```go
+type APIInstaller struct {
+	group             *APIGroupVersion
+	prefix            string // Path prefix where API resources are to be registered.
+	minRequestTimeout time.Duration
+}
+
+// newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
+/*
+	译：newInstaller是创建installer的一个helper。由InstallREST和UpdateREST使用。
+*/
+func (g *APIGroupVersion) newInstaller() *APIInstaller {
+	/*
+		拼装path: "Prefix/Group/Version"
+		然后填充并返回一个APIInstaller对象
+	*/
+	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
+	/*
+		prefix 是: /api/v1, /apis/apps/v1beta1, /apis/authentication.k8s.io/v1beta1,
+			/apis/authorization.k8s.io/v1beta1, /apis/autoscaling/v1 ........
+	*/
+	installer := &APIInstaller{
+		group:             g,
+		prefix:            prefix,
+		minRequestTimeout: g.MinRequestTimeout,
+	}
+	return installer
+}
+```
+
+### NewWebService
+基于APIInstaller对象创建一个webservice
+```go
+// NewWebService creates a new restful webservice with the api installer's prefix and version.
+func (a *APIInstaller) NewWebService() *restful.WebService {
+	ws := new(restful.WebService)
+	ws.Path(a.prefix)
+	// a.prefix contains "prefix/group/version"
+	ws.Doc("API at " + a.prefix)
+	// Backwards compatibility, we accepted objects with empty content-type at V1.
+	// If we stop using go-restful, we can default empty content-type to application/json on an
+	// endpoint by endpoint basis
+	ws.Consumes("*/*")
+	mediaTypes, streamMediaTypes := mediaTypesForSerializer(a.group.Serializer)
+	ws.Produces(append(mediaTypes, streamMediaTypes...)...)
+	ws.ApiVersion(a.group.GroupVersion.String())
+
+	return ws
+}
+```
+
+### Install
+```go
+// Installs handlers for API resources.
+/*
+	func (a *APIInstaller) Install(ws *restful.WebService)
+	先是遍历所有的path，并升序重新排列，
+	然后循环调用接口注册各个URL的API,并将这些注册成功的APIResource加入到同一个切片中。
+*/
+func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversioned.APIResource, errors []error) {
+	errors = make([]error, 0)
+
+	proxyHandler := (&ProxyHandler{
+		prefix: a.prefix + "/proxy/",
+		//a.group.Storage 是如eventStorage、namespaceStorage这些
+		storage:    a.group.Storage,
+		serializer: a.group.Serializer,
+		mapper:     a.group.Context,
+	})
+
+	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
+	// 将所有的path合成一个切片，并按照升序重新排序
+	paths := make([]string, len(a.group.Storage))
+	var i int = 0
+	for path := range a.group.Storage {
+		paths[i] = path
+		i++
+	}
+	sort.Strings(paths)
+	fmt.Println("此时的prefix是: ", a.prefix)
+	/*
+		prefix 是: /api/v1 时
+		paths: [bindings componentstatuses configmaps endpoints events limitranges
+				namespaces namespaces/finalize namespaces/status nodes nodes/proxy
+				nodes/status persistentvolumeclaims persistentvolumeclaims/status
+				persistentvolumes persistentvolumes/status pods pods/attach pods/binding
+				pods/eviction pods/exec pods/log pods/portforward pods/proxy pods/status
+				podtemplates replicationcontrollers replicationcontrollers/scale
+				replicationcontrollers/status resourcequotas resourcequotas/status
+				secrets serviceaccounts services services/proxy services/status]
+		prefix 是: /apis/apps/v1beta1时
+		paths:  [statefulsets statefulsets/status]
+		......
+		......
+	*/
+	for _, path := range paths {
+		/*
+			*********************************************
+			*********************************************
+			注册各个URL，该接口是关键，
+			最终将一个rest.Storage对象转换成实际的restful api，
+			比如getter、lister等处理函数，并将实际的URL关联起来
+			传入的参数：path，rest.Storage，WebService，Handler
+		*/
+		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
+		}
+		/*
+			将所有注册成功的Resource合成一个切片apiResources
+			将该切片作为返回值，便于之后的接口注册list Resources的API
+		*/
+		if apiResource != nil {
+			apiResources = append(apiResources, *apiResource)
+		}
+	}
+	return apiResources, errors
+}
+```
+
+### registerResourceHandlers
+这里完成了关键的REST API注册，func (a *APIInstaller) registerResourceHandlers简介：
+1. 首先构建creater、lister、getter、deleter、updater、patcher、watcher，
+2. 其实他们都是storage，只是对应着对etcd的不同操作。
+3. 然后针对所有的action，构建响应的handler，
+4. 创建对应的route,最后把route添加到service里面。这样就完成了api的注册。
+
+```go
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
+	admit := a.group.Admit
+	context := a.group.Context
+
+	optionsExternalVersion := a.group.GroupVersion
+	if a.group.OptionsExternalVersion != nil {
+		optionsExternalVersion = *a.group.OptionsExternalVersion
+	}
+
+	resource, subresource, err := splitSubresource(path)
+	/*
+		以prefix是:  /api/v1 为例子
+		path is: pods
+		resource, subresource is:  pods
+		mapping is:  &{pods /v1, Kind=Pod 0x4c124a0 0xc4201e9800 {}}
+		path is: pods/attach
+		resource, subresource is:  pods attach
+		mapping is:  &{pods /v1, Kind=Pod 0x4c124a0 0xc4201e9800 {}}
+		path is: pods/binding
+		resource, subresource is:  pods binding
+		mapping is:  &{pods /v1, Kind=Pod 0x4c124a0 0xc4201e9800 {}}
+		path is: pods/eviction
+		resource, subresource is:  pods eviction
+		mapping is:  &{pods /v1, Kind=Pod 0x4c124a0 0xc4201e9800 {}}
+		path is: pods/exec
+		resource, subresource is:  pods exec
+		mapping is:  &{pods /v1, Kind=Pod 0x4c124a0 0xc4201e9800 {}}
+		path is: pods/log
+		resource, subresource is:  pods log
+		mapping is:  &{pods /v1, Kind=Pod 0x4c124a0 0xc4201e9800 {}}
+	*/
+	if err != nil {
+		return nil, err
+	}
+
+	mapping, err := a.restMapping(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	fqKindToRegister, err := a.getResourceKind(path, storage)
+	if err != nil {
+		return nil, err
+	}
+
+	versionedPtr, err := a.group.Creater.New(fqKindToRegister)
+	if err != nil {
+		return nil, err
+	}
+	defaultVersionedObject := indirectArbitraryPointer(versionedPtr)
+	kind := fqKindToRegister.Kind
+	hasSubresource := len(subresource) > 0
+
+	// what verbs are supported by the storage, used to know what verbs we support per path
+	/*
+		构建creater、lister、deleter、updater、watcher等，其实就是storage
+		==>定义在/pkg/api/rest/rest.go
+		这里已经得到该资源支持什么动作，true或者false
+
+		类型断言：该storage是否实现了rest.Creater接口，如果实现了，则返回creater，true
+				否则返回false
+	*/
+	creater, isCreater := storage.(rest.Creater)
+	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
+	lister, isLister := storage.(rest.Lister)
+	getter, isGetter := storage.(rest.Getter)
+	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
+	deleter, isDeleter := storage.(rest.Deleter)
+	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
+	collectionDeleter, isCollectionDeleter := storage.(rest.CollectionDeleter)
+	updater, isUpdater := storage.(rest.Updater)
+	patcher, isPatcher := storage.(rest.Patcher)
+	/*
+		对于pod而言，/pkg/registry/core/pod/etcd/etcd.go，
+		其watch接口来源于pkg/registry/generic/registry的
+		func (e *Store) Watch(ctx api.Context, options *api.ListOptions)
+
+		就pod而言，其对应的podStorage生成是在/pkg/registry/core/rest/storage_core.go
+		==>func (c LegacyRESTStorageProvider) NewLegacyRESTStorage
+			==>podStorage := podetcd.NewStorage
+	*/
+	watcher, isWatcher := storage.(rest.Watcher)
+	_, isRedirector := storage.(rest.Redirector)
+	connecter, isConnecter := storage.(rest.Connecter)
+	storageMeta, isMetadata := storage.(rest.StorageMetadata)
+	if !isMetadata {
+		storageMeta = defaultStorageMetadata{}
+	}
+	exporter, isExporter := storage.(rest.Exporter)
+	if !isExporter {
+		exporter = nil
+	}
+
+	versionedExportOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ExportOptions"))
+	if err != nil {
+		return nil, err
+	}
+
+	if isNamedCreater {
+		isCreater = true
+	}
+
+	var versionedList interface{}
+	if isLister {
+		list := lister.NewList()
+		listGVKs, _, err := a.group.Typer.ObjectKinds(list)
+		if err != nil {
+			return nil, err
+		}
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVKs[0].Kind))
+		if err != nil {
+			return nil, err
+		}
+		versionedList = indirectArbitraryPointer(versionedListPtr)
+	}
+
+	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
+	if err != nil {
+		return nil, err
+	}
+
+	var versionedDeleteOptions runtime.Object
+	var versionedDeleterObject interface{}
+	switch {
+	case isGracefulDeleter:
+		versionedDeleteOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
+		if err != nil {
+			return nil, err
+		}
+		versionedDeleterObject = indirectArbitraryPointer(versionedDeleteOptions)
+		isDeleter = true
+	case isDeleter:
+		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
+	}
+
+	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
+	if err != nil {
+		return nil, err
+	}
+	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
+	var (
+		getOptions             runtime.Object
+		versionedGetOptions    runtime.Object
+		getOptionsInternalKind unversioned.GroupVersionKind
+		getSubpath             bool
+	)
+	if isGetterWithOptions {
+		getOptions, getSubpath, _ = getterWithOptions.NewGetOptions()
+		getOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(getOptions)
+		if err != nil {
+			return nil, err
+		}
+		getOptionsInternalKind = getOptionsInternalKinds[0]
+		versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
+		if err != nil {
+			return nil, err
+		}
+		isGetter = true
+	}
+
+	var versionedWatchEvent interface{}
+	if isWatcher {
+		versionedWatchEventPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind("WatchEvent"))
+		if err != nil {
+			return nil, err
+		}
+		versionedWatchEvent = indirectArbitraryPointer(versionedWatchEventPtr)
+	}
+
+	var (
+		connectOptions             runtime.Object
+		versionedConnectOptions    runtime.Object
+		connectOptionsInternalKind unversioned.GroupVersionKind
+		connectSubpath             bool
+	)
+	if isConnecter {
+		connectOptions, connectSubpath, _ = connecter.NewConnectOptions()
+		if connectOptions != nil {
+			connectOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(connectOptions)
+			if err != nil {
+				return nil, err
+			}
+
+			connectOptionsInternalKind = connectOptionsInternalKinds[0]
+			versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	var ctxFn ContextFunc
+	ctxFn = func(req *restful.Request) api.Context {
+		if context == nil {
+			return api.WithUserAgent(api.NewContext(), req.HeaderParameter("User-Agent"))
+		}
+		if ctx, ok := context.Get(req.Request); ok {
+			return api.WithUserAgent(ctx, req.HeaderParameter("User-Agent"))
+		}
+		return api.WithUserAgent(api.NewContext(), req.HeaderParameter("User-Agent"))
+	}
+
+	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
+	scope := mapping.Scope
+	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
+	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
+
+	params := []*restful.Parameter{}
+	actions := []action{}
+
+	var resourceKind string
+	kindProvider, ok := storage.(rest.KindProvider)
+	if ok {
+		resourceKind = kindProvider.Kind()
+	} else {
+		resourceKind = kind
+	}
+
+	var apiResource unversioned.APIResource
+	// Get the list of actions for the given scope.
+	/*
+		k8s资源分为两类：无namespace的RESTScopeNameRoot;
+		有namespace的RESTScopeNameNamespace
+		在对应的path上添加各类actions，并指定对应的handler。
+	*/
+	switch scope.Name() {
+	case meta.RESTScopeNameRoot:
+		// Handle non-namespace scoped resources like nodes.
+		resourcePath := resource
+		resourceParams := params
+		itemPath := resourcePath + "/{name}"
+		nameParams := append(params, nameParam)
+		proxyParams := append(nameParams, pathParam)
+		suffix := ""
+		if hasSubresource {
+			suffix = "/" + subresource
+			itemPath = itemPath + suffix
+			resourcePath = itemPath
+			resourceParams = nameParams
+		}
+		apiResource.Name = path
+		apiResource.Namespaced = false
+		apiResource.Kind = resourceKind
+		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, resourcePath, "/"), suffix}
+
+		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
+		// Add actions at the resource path: /api/apiVersion/resource
+		/*
+			给resource path: /api/apiVersion/resource 添加动作
+			namer就是GVR
+
+			****例子***
+			resourcePath, resourceParams is:  componentstatuses []
+			itemPath is:  componentstatuses/{name}
+			namer is:  {0x4c124e0 {} /api/v1/componentstatuses }
+
+			resourcePath, resourceParams is:  namespaces []
+			itemPath is:  namespaces/{name}
+			namer is:  {0x4c124e0 {} /api/v1/namespaces }
+		*/
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		// DEPRECATED
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+
+		// Add actions at the item path: /api/apiVersion/resource/{name}
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		if getSubpath {
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+		}
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
+		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
+		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
+		// TODO: DEPRECATED in v1.2.
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
+		// TODO: DEPRECATED in v1.2.
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+		break
+	case meta.RESTScopeNameNamespace:
+		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
+		namespaceParam := ws.PathParameter(scope.ArgumentName(), scope.ParamDescription()).DataType("string")
+		namespacedPath := scope.ParamName() + "/{" + scope.ArgumentName() + "}/" + resource
+		namespaceParams := []*restful.Parameter{namespaceParam}
+
+		resourcePath := namespacedPath
+		resourceParams := namespaceParams
+		itemPathPrefix := gpath.Join(a.prefix, scope.ParamName()) + "/"
+		itemPath := namespacedPath + "/{name}"
+		itemPathMiddle := "/" + resource + "/"
+		nameParams := append(namespaceParams, nameParam)
+		proxyParams := append(nameParams, pathParam)
+		itemPathSuffix := ""
+		if hasSubresource {
+			itemPathSuffix = "/" + subresource
+			itemPath = itemPath + itemPathSuffix
+			resourcePath = itemPath
+			resourceParams = nameParams
+		}
+		apiResource.Name = path
+		apiResource.Namespaced = true
+		apiResource.Kind = resourceKind
+
+		itemPathFn := func(name, namespace string) bytes.Buffer {
+			var buf bytes.Buffer
+			buf.WriteString(itemPathPrefix)
+			buf.WriteString(url.QueryEscape(namespace))
+			buf.WriteString(itemPathMiddle)
+			buf.WriteString(url.QueryEscape(name))
+			buf.WriteString(itemPathSuffix)
+			return buf
+		}
+		namer := scopeNaming{scope, a.group.Linker, itemPathFn, false}
+		/*
+			resourcePath, resourceParams is:  namespaces/{namespace}/bindings [0xc42043df48]
+			itemPath is:  namespaces/{namespace}/bindings/{name}
+			namer is:  {0x4c124a0 {} 0x830550 false}
+
+			resourcePath, resourceParams is:  namespaces/{namespace}/events [0xc420026520]
+			itemPath is:  namespaces/{namespace}/events/{name}
+			namer is:  {0x4c124a0 {} 0x830550 false}
+		*/
+
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		// DEPRECATED
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		if getSubpath {
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+		}
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
+		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
+		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
+		// TODO: DEPRECATED in v1.2.
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
+		// TODO: DEPRECATED in v1.2.
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+
+		// list or post across namespace.
+		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
+		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
+		if !hasSubresource {
+			namer = scopeNaming{scope, a.group.Linker, itemPathFn, true}
+			actions = appendIf(actions, action{"LIST", resource, params, namer, true}, isLister)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
+		}
+		break
+	default:
+		return nil, fmt.Errorf("unsupported restscope: %s", scope.Name())
+	}
+
+	/**为上面的action创建路由**/
+	// Create Routes for the actions.
+	// TODO: Add status documentation using Returns()
+	// Errors (see api/errors/errors.go as well as go-restful router):
+	// http.StatusNotFound, http.StatusMethodNotAllowed,
+	// http.StatusUnsupportedMediaType, http.StatusNotAcceptable,
+	// http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
+	// http.StatusRequestTimeout, http.StatusConflict, http.StatusPreconditionFailed,
+	// 422 (StatusUnprocessableEntity), http.StatusInternalServerError,
+	// http.StatusServiceUnavailable
+	// and api error codes
+	// Note that if we specify a versioned Status object here, we may need to
+	// create one for the tests, also
+	// Success:
+	// http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent
+	//
+	// test/integration/auth_test.go is currently the most comprehensive status code test
+
+	mediaTypes, streamMediaTypes := mediaTypesForSerializer(a.group.Serializer)
+	allMediaTypes := append(mediaTypes, streamMediaTypes...)
+	ws.Produces(allMediaTypes...)
+
+	reqScope := RequestScope{
+		ContextFunc:    ctxFn,
+		Serializer:     a.group.Serializer,
+		ParameterCodec: a.group.ParameterCodec,
+		Creater:        a.group.Creater,
+		Convertor:      a.group.Convertor,
+		Copier:         a.group.Copier,
+
+		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
+		Resource:    a.group.GroupVersion.WithResource(resource),
+		Subresource: subresource,
+		Kind:        fqKindToRegister,
+	}
+	/*
+		根据之前生成的actions,进行遍历
+		然后在WebService中添加指定的route
+	*/
+	for _, action := range actions {
+		versionedObject := storageMeta.ProducesObject(action.Verb)
+		if versionedObject == nil {
+			versionedObject = defaultVersionedObject
+		}
+		reqScope.Namer = action.Namer
+		namespaced := ""
+		if apiResource.Namespaced {
+			namespaced = "Namespaced"
+		}
+		operationSuffix := ""
+		if strings.HasSuffix(action.Path, "/{path:*}") {
+			operationSuffix = operationSuffix + "WithPath"
+		}
+		if action.AllNamespaces {
+			operationSuffix = operationSuffix + "ForAllNamespaces"
+			namespaced = ""
+		}
+
+		/*
+			根据action的动作类型
+			生成响应的handler，创建route添加到WebService中
+			注意该动作是针对一个resource还是所有的resources？？？
+		*/
+		switch action.Verb {
+		case "GET": // Get a resource.
+			var handler restful.RouteFunction
+			/*
+				判断是否有参数，以决定handler函数
+			*/
+			if isGetterWithOptions {
+				handler = GetResourceWithOptions(getterWithOptions, reqScope)
+			} else {
+				handler = GetResource(getter, exporter, reqScope)
+			}
+			/*
+				生成处理函数
+			*/
+			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
+			doc := "read the specified " + kind
+			if hasSubresource {
+				doc = "read " + subresource + " of the specified " + kind
+			}
+			route := ws.GET(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Returns(http.StatusOK, "OK", versionedObject).
+				Writes(versionedObject)
+			if isGetterWithOptions {
+				if err := addObjectParams(ws, route, versionedGetOptions); err != nil {
+					return nil, err
+				}
+			}
+			if isExporter {
+				if err := addObjectParams(ws, route, versionedExportOptions); err != nil {
+					return nil, err
+				}
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "LIST": // List all resources of a kind.
+			doc := "list objects of kind " + kind
+			if hasSubresource {
+				doc = "list " + subresource + " of objects of kind " + kind
+			}
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
+				Returns(http.StatusOK, "OK", versionedList).
+				Writes(versionedList)
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return nil, err
+			}
+			switch {
+			case isLister && isWatcher:
+				doc := "list or watch objects of kind " + kind
+				if hasSubresource {
+					doc = "list or watch " + subresource + " of objects of kind " + kind
+				}
+				route.Doc(doc)
+			case isWatcher:
+				doc := "watch objects of kind " + kind
+				if hasSubresource {
+					doc = "watch " + subresource + "of objects of kind " + kind
+				}
+				route.Doc(doc)
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "PUT": // Update a resource.
+			doc := "replace the specified " + kind
+			if hasSubresource {
+				doc = "replace " + subresource + " of the specified " + kind
+			}
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, UpdateResource(updater, reqScope, a.group.Typer, admit))
+			route := ws.PUT(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Returns(http.StatusOK, "OK", versionedObject).
+				Reads(versionedObject).
+				Writes(versionedObject)
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "PATCH": // Partially update a resource
+			//部分更新一个resource
+			doc := "partially update the specified " + kind
+			if hasSubresource {
+				doc = "partially update " + subresource + " of the specified " + kind
+			}
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor))
+			route := ws.PATCH(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
+				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Returns(http.StatusOK, "OK", versionedObject).
+				Reads(unversioned.Patch{}).
+				Writes(versionedObject)
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "POST": // Create a resource.
+			var handler restful.RouteFunction
+			if isNamedCreater {
+				handler = CreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
+			} else {
+				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
+			}
+			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
+			article := utilstrings.GetArticleForNoun(kind, " ")
+			doc := "create" + article + kind
+			if hasSubresource {
+				doc = "create " + subresource + " of" + article + kind
+			}
+			route := ws.POST(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Returns(http.StatusOK, "OK", versionedObject).
+				Reads(versionedObject).
+				Writes(versionedObject)
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "DELETE": // Delete a resource.
+			article := utilstrings.GetArticleForNoun(kind, " ")
+			doc := "delete" + article + kind
+			if hasSubresource {
+				doc = "delete " + subresource + " of" + article + kind
+			}
+			/*
+				  eg:
+					doc is 是:  delete a Job
+					resource is: jobs
+			*/
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+			route := ws.DELETE(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Writes(versionedStatus).
+				Returns(http.StatusOK, "OK", versionedStatus)
+			if isGracefulDeleter {
+				route.Reads(versionedDeleterObject)
+				if err := addObjectParams(ws, route, versionedDeleteOptions); err != nil {
+					return nil, err
+				}
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		case "DELETECOLLECTION":
+			doc := "delete collection of " + kind
+			if hasSubresource {
+				doc = "delete collection of " + subresource + " of a " + kind
+			}
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, DeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+			route := ws.DELETE(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Writes(versionedStatus).
+				Returns(http.StatusOK, "OK", versionedStatus)
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return nil, err
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		// TODO: deprecated
+		case "WATCH": // Watch a resource.
+			doc := "watch changes to an object of kind " + kind
+			if hasSubresource {
+				doc = "watch changes to " + subresource + " of an object of kind " + kind
+			}
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+				Produces(allMediaTypes...).
+				Returns(http.StatusOK, "OK", versionedWatchEvent).
+				Writes(versionedWatchEvent)
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return nil, err
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		// TODO: deprecated
+		case "WATCHLIST": // Watch all resources of a kind.
+			doc := "watch individual changes to a list of " + kind
+			if hasSubresource {
+				doc = "watch individual changes to a list of " + subresource + " of " + kind
+			}
+			/*
+				构造handler函数，重要的部分是ListResource(lister, watcher, reqScope, true, a.minRequestTimeout)函数
+			*/
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(handler).
+				Doc(doc).
+				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
+				Produces(allMediaTypes...).
+				Returns(http.StatusOK, "OK", versionedWatchEvent).
+				Writes(versionedWatchEvent)
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return nil, err
+			}
+			addParams(route, action.Params)
+			ws.Route(route)
+		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
+		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
+		// TODO: DEPRECATED in v1.2.
+		case "PROXY": // Proxy requests to a resource.
+			// Accept all methods as per http://issue.k8s.io/3996
+			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
+			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
+			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
+			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
+			addProxyRoute(ws, "HEAD", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
+			addProxyRoute(ws, "OPTIONS", a.prefix, action.Path, proxyHandler, namespaced, kind, resource, subresource, hasSubresource, action.Params, operationSuffix)
+		case "CONNECT":
+			for _, method := range connecter.ConnectMethods() {
+				doc := "connect " + method + " requests to " + kind
+				if hasSubresource {
+					doc = "connect " + method + " requests to " + subresource + " of " + kind
+				}
+				handler := metrics.InstrumentRouteFunc(action.Verb, resource, ConnectResource(connecter, reqScope, admit, path))
+				route := ws.Method(method).Path(action.Path).
+					To(handler).
+					Doc(doc).
+					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
+					Produces("*/*").
+					Consumes("*/*").
+					Writes("string")
+				if versionedConnectOptions != nil {
+					if err := addObjectParams(ws, route, versionedConnectOptions); err != nil {
+						return nil, err
+					}
+				}
+				addParams(route, action.Params)
+				ws.Route(route)
+			}
+		default:
+			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
+		}
+		// Note: update GetAttribs() when adding a custom handler.
+	}
+	return &apiResource, nil
 }
 ```
