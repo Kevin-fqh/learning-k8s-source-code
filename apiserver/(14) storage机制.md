@@ -167,6 +167,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 下面来分析怎么查看一个资源都实现哪些接口函数？以便在安装Restful API的类型断言的时候识别出来。
 ## podStorage
+这个地方需要注意的有两点:
+1. 是公有成员，还是私有成员？
+2. 是否出现了同名函数？
+
 podStorage是通过`NewStorage`函数来创建的，先看看其定义
 ```go
 func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
@@ -326,6 +330,23 @@ namespaceStorage和podStorage.Pod的大部分是一样的，有一点区别在�
 - namespaceStorage通过`type REST struct`来显式声明了一个Delete函数，而`&registry.Store`本身也有一个Delete函数，两边出现了同名函数。这个时候类型断言判断用到的Delete函数应该是显式声明的那个func (r *REST) Delete。而不是`&registry.Store`的Delete()
 - podStorage.Pod通过`type REST struct`显式声明的函数没有和`&registry.Store`重名的
 
+```go
+// NewREST returns a RESTStorage object that will work against namespaces.
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
+	...
+	...
+	/*
+		storage实现了什么方法都是由三个结构体type REST struct 、StatusREST、FinalizeREST来决定的
+
+		type REST struct的大部分方法来源于 *registry.Store，自身又显式声明了一个Delete函数
+		两边都有一个Delete函数
+		这个时候，对外部显示的就只有type REST struct显式声明的Delete函数
+		虽然显式的Delete函数最后还是会调用*registry.Store的同名函数
+	*/
+	return &REST{Store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}
+}
+```
+
 执行kubectl delete namespace {xx}的时候，会先调用函数func (r *REST) Delete，
 但最终还是调用&registry.Store的同名Delete()函数。
 ```go
@@ -337,7 +358,6 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	*/
 	return r.Store.Delete(ctx, name, options)
 }
-
 ```
 
 
