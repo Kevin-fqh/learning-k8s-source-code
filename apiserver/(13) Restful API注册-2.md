@@ -93,6 +93,7 @@ k8s.io/kubernetes/pkg/registry/
 3. 创建各类Storage，如podStorage、nodeStorage...(还搞不清和步骤2中restStorage的关系。。？？)
 4. 把步骤3中创建的各种Storage保存到restStorageMap中，然后装在到APIGroupInfo中，APIGroupInfo.VersionedResourcesStorageMap["v1"]。这是API映射map，这很重要，在后面的利用APIGroupInfo来生成APIGroupVersion的时候，就是依靠这个map映射关系来获取对应version的资源的rest strorage实现。
 5. return restStorage, APIGroupInfo
+
 ```go
 func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter genericapiserver.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
 	// 初始化创建一个APIGroupInfo
@@ -229,7 +230,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		这是API映射map
 	*/
 	restStorageMap := map[string]rest.Storage{
-		"pods":             podStorage.Pod,
+		"pods":             podStorage.Pod, //这个才是最小范围的真正的`podStorage`
 		"pods/attach":      podStorage.Attach,
 		"pods/status":      podStorage.Status,
 		"pods/log":         podStorage.Log,
@@ -272,6 +273,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate),
 	}
+
 	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
 	}
@@ -291,6 +293,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	return restStorage, apiGroupInfo, nil
 }
 ```
+
 看看数据结构`type LegacyRESTStorage struct`:
 - type LegacyRESTStorage struct
 ```go
@@ -723,20 +726,10 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 这里完成了关键的REST API注册，分析其流程如下(分析案例prefix: /api/v1 path: pods):
 1. 根据path获取资源，此时resource is:  pods
 2. 根据resource获取restMapping。mapping, err := a.restMapping(resource)
-3. 利用类型断言判断该storage实现了的Interface，获取Creater/Lister...的接口。这里需要注意的一点就是很多公共的接口都是通过&registry.Store来实现的，而不是直接定义在具体的Storage如PodStorage结构体上。
+3. 利用类型断言判断该storage实现了的Interface，获取Creater/Lister...的接口(必须是public函数，首字母大写)。这里注意当两边声明了同名函数的时候会优先调用type Rest Struct的函数。通过type Rest Struct的函数来调用`/pkg/registry/generic/registry/store.go`中的同名函数。
 ```
-&registry.Store是公共的Store
-Storage如PodStorage是具体类型的Store，
-很多公共接口都定义在/pkg/registry/generic/registry/store.go中，如Watch
-具体类型的Storage都实现了&registry.Store接口
-
-对于pod而言，/pkg/registry/core/pod/etcd/etcd.go，
-其watch接口来源于/pkg/registry/generic/registry/store.go的
-	==>func (e *Store) Watch(ctx api.Context, options *api.ListOptions)
-
-就pod而言，其对应的podStorage生成是在/pkg/registry/core/rest/storage_core.go
-	==>func (c LegacyRESTStorageProvider) NewLegacyRESTStorage
-		==>podStorage := podetcd.NewStorage
+	==>/pkg/registry/core/namespace/etcd/etcd.go，/pkg/registry/core/pod/etcd/etcd.go
+	==>/pkg/registry/generic/registry/store.go
 ```
 4. 设置URL的部分参数值
 ```go
@@ -778,12 +771,19 @@ type action struct {
 actions content is: [{POST namespaces/{namespace}/bindings [0xc420447f60] {0x4c144a0 {} 0x830830 false} false}]
 **actions length is:*** 2
 actions content is: [{LIST componentstatuses [] {0x4c144e0 {} /api/v1/componentstatuses } false} {GET componentstatuses/{name} [0xc420447f90] {0x4c144e0 {} /api/v1/componentstatuses } false}]
+
 **actions length is:*** 11
 actions content is: [{LIST nodes [] {0x4c144e0 {} /api/v1/nodes } false} {POST nodes [] {0x4c144e0 {} /api/v1/nodes } false} {DELETECOLLECTION nodes [] {0x4c144e0 {} /api/v1/nodes } false} {WATCHLIST watch/nodes [] {0x4c144e0 {} /api/v1/nodes } false} {GET nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PUT nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PATCH nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {DELETE nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {WATCH watch/nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false} {PROXY proxy/nodes/{name}/{path:*} [0xc420024c78 0xc420024c80] {0x4c144e0 {} /api/v1/nodes } false} {PROXY proxy/nodes/{name} [0xc420024c78] {0x4c144e0 {} /api/v1/nodes } false}]
+
+**actions length is:*** 9
+actions content is: [{LIST namespaces [] {0x4c144e0 {} /api/v1/namespaces } false} {POST namespaces [] {0x4c144e0 {} /api/v1/namespaces } false} {DELETECOLLECTION namespaces [] {0x4c144e0 {} /api/v1/namespaces } false} {WATCHLIST watch/namespaces [] {0x4c144e0 {} /api/v1/namespaces } false} {GET namespaces/{name} [0xc420447740] {0x4c144e0 {} /api/v1/namespaces } false} {PUT namespaces/{name} [0xc420447740] {0x4c144e0 {} /api/v1/namespaces } false} {PATCH namespaces/{name} [0xc420447740] {0x4c144e0 {} /api/v1/namespaces } false} {DELETE namespaces/{name} [0xc420447740] {0x4c144e0 {} /api/v1/namespaces } false} {WATCH watch/namespaces/{name} [0xc420447740] {0x4c144e0 {} /api/v1/namespaces } false}]
+
+**actions length is:*** 9
+actions content is: [{LIST persistentvolumes [] {0x4c144e0 {} /api/v1/persistentvolumes } false} {POST persistentvolumes [] {0x4c144e0 {} /api/v1/persistentvolumes } false} {DELETECOLLECTION persistentvolumes [] {0x4c144e0 {} /api/v1/persistentvolumes } false} {WATCHLIST watch/persistentvolumes [] {0x4c144e0 {} /api/v1/persistentvolumes } false} {GET persistentvolumes/{name} [0xc420022138] {0x4c144e0 {} /api/v1/persistentvolumes } false} {PUT persistentvolumes/{name} [0xc420022138] {0x4c144e0 {} /api/v1/persistentvolumes } false} {PATCH persistentvolumes/{name} [0xc420022138] {0x4c144e0 {} /api/v1/persistentvolumes } false} {DELETE persistentvolumes/{name} [0xc420022138] {0x4c144e0 {} /api/v1/persistentvolumes } false} {WATCH watch/persistentvolumes/{name} [0xc420022138] {0x4c144e0 {} /api/v1/persistentvolumes } false}]
 ```
 
 - func (a *APIInstaller) registerResourceHandlers  
-最后来看看`registerResourceHandlers`函数的定义
+再来看看`registerResourceHandlers`函数的定义
 ```go
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
 	admit := a.group.Admit
@@ -855,7 +855,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		这里已经得到该资源支持什么动作，true或者false
 
 		这里需要注意的一点就是很多公共的接口都是通过&registry.Store来实现的，
-		而不是直接定义在具体的Storage如PodStorage结构体上。
+		而不是直接定义在具体的Storage结构体上。
+
+		在/pkg/registry/core/pod/etcd/etcd.go查看pod所支持的接口
 
 		类型断言：该storage是否实现了rest.Creater接口，如果实现了，则返回creater，true
 				否则返回false
@@ -875,9 +877,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		其watch接口来源于/pkg/registry/generic/registry/store.go的
 		func (e *Store) Watch(ctx api.Context, options *api.ListOptions)
 
-		就pod而言，其对应的podStorage生成是在/pkg/registry/core/rest/storage_core.go
+		就/pods而言，其对应的storage生成是在/pkg/registry/core/rest/storage_core.go
 		==>func (c LegacyRESTStorageProvider) NewLegacyRESTStorage
 			==>podStorage := podetcd.NewStorage
+				==>"pods":             podStorage.Pod,
 	*/
 	watcher, isWatcher := storage.(rest.Watcher)
 	_, isRedirector := storage.(rest.Redirector)
@@ -1221,7 +1224,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions content is: [{POST namespaces/{namespace}/bindings [0xc420447f60] {0x4c144a0 {} 0x830830 false} false}]
 		**actions length is:*** 2
 		actions content is: [{LIST componentstatuses [] {0x4c144e0 {} /api/v1/componentstatuses } false} {GET componentstatuses/{name} [0xc420447f90] {0x4c144e0 {} /api/v1/componentstatuses } false}]
+		**actions length is:*** 1
+		[{POST namespaces/{namespace}/pods/{name}/binding [0xc4200259c0 0xc4200259b0] {0x4c134a0 {} 0x8303e0 false} false}]
 	*/
+
 	for _, action := range actions {
 		versionedObject := storageMeta.ProducesObject(action.Verb)
 		if versionedObject == nil {
@@ -1499,6 +1505,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	return &apiResource, nil
 }
+
 ```
 
 ## 总结
@@ -1506,4 +1513,4 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 关于/api和/apis的区别其实并不大，注册过程都是大同小异。
 
-后续将要讲解里面提到的podStorage是怎么实现？
+后续将要讲解里面提到的podStorage是怎么实现？同时怎么查看一个资源都实现哪些接口函数？以便在类型断言的时候识别出来。
