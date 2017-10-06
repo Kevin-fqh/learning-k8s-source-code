@@ -360,5 +360,36 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 }
 ```
 
+## 一个有用的debug函数
+查看该结构体所拥有的成员
+```go
+func fqhGetMembers(i interface{}) {
+	t := reflect.TypeOf(i)
+	fmt.Println(t.PkgPath())
+	for {
+		if t.Kind() == reflect.Struct {
+			fmt.Printf("\n%-8v %v 个字段:\n", t, t.NumField())
+			for i := 0; i < t.NumField(); i++ {
+				fmt.Println(t.Field(i).Name, t.Field(i).Type)
+			}
+		}
+		fmt.Printf("\n%-8v %v 个方法:\n", t, t.NumMethod())
+		for i := 0; i < t.NumMethod(); i++ {
+			fmt.Println(t.Method(i).Name, t.Method(i).PkgPath)
+		}
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		} else {
+			break
+		}
+	}
+}
+```
+用法如下
+```go
+fqhGetMembers(&REST{})
+fqhGetMembers(&registry.Store{})
+```
+
 
 
