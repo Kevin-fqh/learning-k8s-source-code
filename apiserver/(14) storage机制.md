@@ -392,5 +392,11 @@ fqhGetMembers(&REST{})
 fqhGetMembers(&registry.Store{})
 ```
 
+## Daemon
+仿造Apiserver利用类型断言来判断一个路径所支持的接口
+```go
+
+```
+
 
 

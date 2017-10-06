@@ -228,9 +228,11 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 		然后赋值给APIGroupInfo.VersionedResourcesStorageMap["v1"]
 		这是API映射map
+		
+		podStorage 是所有路径为/pods的rest storage，要注意区分范围
 	*/
 	restStorageMap := map[string]rest.Storage{
-		"pods":             podStorage.Pod, //这个才是最小范围的真正的`podStorage`
+		"pods":             podStorage.Pod, //这个才是最小范围的真正的/pods 的storage
 		"pods/attach":      podStorage.Attach,
 		"pods/status":      podStorage.Status,
 		"pods/log":         podStorage.Log,
@@ -726,7 +728,7 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 这里完成了关键的REST API注册，分析其流程如下(分析案例prefix: /api/v1 path: pods):
 1. 根据path获取资源，此时resource is:  pods
 2. 根据resource获取restMapping。mapping, err := a.restMapping(resource)
-3. 利用类型断言判断该storage实现了的Interface，获取Creater/Lister...的接口(必须是public函数，首字母大写)。这里注意当两边声明了同名函数的时候会优先调用type Rest Struct的显式声明函数。在type Rest Struct的函数中来调用`/pkg/registry/generic/registry/store.go`中的同名函数。
+3. 利用类型断言判断该storage实现了的Interface，获取Creater/Lister...的接口(必须是public函数，首字母大写)。一部分公共的接口是通过&registry.Store来声明的，而不是直接定义在具体的Storage如PodStorage.Pod的结构体上。这里注意当两边声明了同名函数的时候会优先调用type Rest Struct的显式声明函数。在type Rest Struct的函数中来调用`/pkg/registry/generic/registry/store.go`中的同名函数。
 ```
 	==>/pkg/registry/core/namespace/etcd/etcd.go，/pkg/registry/core/pod/etcd/etcd.go
 	==>/pkg/registry/generic/registry/store.go
@@ -856,6 +858,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		这里需要注意的一点就是很多公共的接口都是通过&registry.Store来实现的，
 		而不是直接定义在具体的Storage结构体上。
+		注意当两边声明了同名函数的时候会优先调用type Rest Struct的函数。通过type Rest Struct的函数来调用`/pkg/registry/generic/registry/store.go`中的同名函数。
+			==>/pkg/registry/core/namespace/etcd/etcd.go，/pkg/registry/core/pod/etcd/etcd.go
+			==>/pkg/registry/generic/registry/store.go
 
 		在/pkg/registry/core/pod/etcd/etcd.go查看pod所支持的接口
 
@@ -1505,7 +1510,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	return &apiResource, nil
 }
-
 ```
 
 ## 总结
