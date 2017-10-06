@@ -726,7 +726,7 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 这里完成了关键的REST API注册，分析其流程如下(分析案例prefix: /api/v1 path: pods):
 1. 根据path获取资源，此时resource is:  pods
 2. 根据resource获取restMapping。mapping, err := a.restMapping(resource)
-3. 利用类型断言判断该storage实现了的Interface，获取Creater/Lister...的接口(必须是public函数，首字母大写)。这里注意当两边声明了同名函数的时候会优先调用type Rest Struct的函数。通过type Rest Struct的函数来调用`/pkg/registry/generic/registry/store.go`中的同名函数。
+3. 利用类型断言判断该storage实现了的Interface，获取Creater/Lister...的接口(必须是public函数，首字母大写)。这里注意当两边声明了同名函数的时候会优先调用type Rest Struct的显式声明函数。在type Rest Struct的函数中来调用`/pkg/registry/generic/registry/store.go`中的同名函数。
 ```
 	==>/pkg/registry/core/namespace/etcd/etcd.go，/pkg/registry/core/pod/etcd/etcd.go
 	==>/pkg/registry/generic/registry/store.go

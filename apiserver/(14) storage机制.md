@@ -323,7 +323,7 @@ func (r *REST) ResourceLocation
 
 ## namespaceStorage
 namespaceStorage和podStorage.Pod的大部分是一样的，有一点区别在于
-- namespaceStorage通过`type REST struct`来显式声明了一个Delete函数，而`&registry.Store`本身也有一个Delete函数。这个时候类型断言判断的Delete函数应该是显式声明的那个func (r *REST) Delete。
+- namespaceStorage通过`type REST struct`来显式声明了一个Delete函数，而`&registry.Store`本身也有一个Delete函数，两边出现了同名函数。这个时候类型断言判断用到的Delete函数应该是显式声明的那个func (r *REST) Delete。而不是`&registry.Store`的Delete()
 - podStorage.Pod通过`type REST struct`显式声明的函数没有和`&registry.Store`重名的
 
 执行kubectl delete namespace {xx}的时候，会先调用函数func (r *REST) Delete，
