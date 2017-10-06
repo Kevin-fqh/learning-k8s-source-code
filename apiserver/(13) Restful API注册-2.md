@@ -5,7 +5,7 @@
   - [注册核心Group-InstallLegacyAPI](#注册核心group-installlegacyapi)
   - [type LegacyRESTStorageProvider struct](#type-legacyreststorageprovider-struct)
 	- [NewLegacyRESTStorage](#newlegacyreststorage)
-  - [InstallLegacyAPIGroup，使用APIGroupInfo](#installlegacyapigroup，使用apigroupinfo)
+  - [InstallLegacyAPIGroup，使用APIGroupInfo](#installlegacyapigroup)
   - [installAPIResources](#installapiresources)
   - [创建APIGroupVersion](#创建apigroupversion)
   - [InstallREST安装restful API](#installrest安装restful-api)
@@ -309,7 +309,12 @@ type LegacyRESTStorage struct {
 }
 ```
 
-## InstallLegacyAPIGroup，使用APIGroupInfo
+## InstallLegacyAPIGroup
+NewLegacyRESTStorage主要功能：在APIGroupInfo中装载各类的storage。
+
+后期，GenericAPIServer会根据APIGroupInfo中的storage，自动生成REST handler。
+
+apiserver在存取资源时，最终也是通过各个storage完成
 ```go
 func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	// 判断前缀参数是否正确
@@ -1498,5 +1503,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 ## 总结
 本文主要讲解了如何把所有GroupVersion中定义的资源生成Restful API，主要是根据go－restful的流程。中间穿插着APIGroupVersion、APIGroupInfo、Scheme、GroupMeta、RESTMapper、APIRegistrationManager几个数据结构的使用。搞清楚这几个数据结构的脉络关系，基本就了解这个注册过程。
+
+关于/api和/apis的区别其实并不大，注册过程都是大同小异。
 
 后续将要讲解里面提到的podStorage是怎么实现？
