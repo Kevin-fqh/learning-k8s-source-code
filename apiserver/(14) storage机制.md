@@ -173,7 +173,25 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 1. 是公有成员，还是私有成员？
 2. 是否出现了同名函数？
 
-podStorage是通过`NewStorage`函数来创建的，先看看其定义
+podStorage是通过`NewStorage`函数来创建的，先看看其定义和创建函数
+
+- type PodStorage struct
+```
+// PodStorage includes storage for pods and all sub resources
+type PodStorage struct {
+	Pod         *REST
+	Binding     *BindingREST
+	Eviction    *EvictionREST
+	Status      *StatusREST
+	Log         *podrest.LogREST
+	Proxy       *podrest.ProxyREST
+	Exec        *podrest.ExecREST
+	Attach      *podrest.AttachREST
+	PortForward *podrest.PortForwardREST
+}
+```
+
+- func NewStorage
 ```go
 func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
 	prefix := "/" + opts.ResourcePrefix
