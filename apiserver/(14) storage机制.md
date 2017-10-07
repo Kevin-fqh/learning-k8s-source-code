@@ -394,8 +394,159 @@ fqhGetMembers(&registry.Store{})
 
 ## Daemon
 仿造Apiserver利用类型断言来判断一个路径所支持的接口
-```go
 
+```go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+func GetMembers(i interface{}) {
+	t := reflect.TypeOf(i)
+	for {
+		if t.Kind() == reflect.Struct {
+			fmt.Printf("\n%-8v %v 个字段:\n", t, t.NumField())
+			for i := 0; i < t.NumField(); i++ {
+				fmt.Println(t.Field(i).Name)
+			}
+		}
+		fmt.Printf("\n%-8v %v 个方法:\n", t, t.NumMethod())
+		for i := 0; i < t.NumMethod(); i++ {
+			fmt.Println(t.Method(i).Name)
+		}
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		} else {
+			break
+		}
+	}
+}
+
+//interface定义
+type Storage interface {
+	New()
+}
+type Lister interface {
+	List()
+}
+
+type Exporter interface {
+	Export()
+}
+
+//type Store struct定义
+type Store struct {
+	a string
+}
+
+func (c *Store) New() {
+	fmt.Println("func (c *Store) New()")
+}
+func (c *Store) List() {
+	fmt.Println("func (c *Store) List()")
+}
+func (c *Store) Export() {
+	fmt.Println("func (c *Store) Export()")
+}
+func (c *Store) Create() {
+	fmt.Println("func (c *Store) Create()")
+}
+func (c *Store) Delete() {
+	fmt.Println("func (c *Store) Delete()")
+}
+
+//要检测的type REST struct
+type REST struct {
+	*Store
+}
+
+func new_REST() *REST {
+	ss := &Store{a: "This is new_REST"}
+	t := &REST{ss}
+	return t
+}
+
+//要检测的type BindingREST struct
+type BindingREST struct {
+	store *Store //首字母小写
+}
+
+func (b *BindingREST) New() {
+	fmt.Println("func (b *BindingREST) New()")
+}
+
+func (b *BindingREST) Bind() {
+	fmt.Println("func (b *BindingREST) bind()")
+}
+func (b *BindingREST) Export() {
+	fmt.Println("func (b *BindingREST) Export()")
+}
+
+func new_BindingREST() *BindingREST {
+	ss := &Store{a: "This is new_BindingREST"}
+	t := &BindingREST{store: ss}
+	return t
+}
+
+//断言函数,要经过一个interface的转换，断言只能用在interface上
+func judge(store Storage) {
+	_, isLister := store.(Lister)
+	fmt.Println("isLister", isLister)
+	_, isExporter := store.(Exporter)
+	fmt.Println("isLister", isExporter)
+}
+func main() {
+	fmt.Println("check REST-----")
+	target := new_REST()
+	judge(target)
+	GetMembers(target)
+
+	fmt.Println("check BindingREST-----")
+	ta := new_BindingREST()
+	judge(ta)
+	ta.Export()
+	GetMembers(ta)
+}
+```
+
+输出结果如下
+```
+check REST-----
+isLister true
+isLister true
+
+*main.REST 5 个方法:
+Create
+Delete
+Export
+List
+New
+
+main.REST 1 个字段:
+Store
+
+main.REST 5 个方法:
+Create
+Delete
+Export
+List
+New
+check BindingREST-----
+isLister false
+isLister true
+func (b *BindingREST) Export()
+
+*main.BindingREST 3 个方法:
+Bind
+Export
+New
+
+main.BindingREST 1 个字段:
+store
+
+main.BindingREST 0 个方法:
 ```
 
 
