@@ -9,6 +9,7 @@
 	- [路径/pods](#路径/pods)
   - [namespaceStorage](#namespacestorage)
   - [一个有用的debug函数](#一个有用的debug函数)
+  - [Daemon](#daemon)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
