@@ -195,9 +195,6 @@ type PodStorage struct {
 ```go
 func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
 	prefix := "/" + opts.ResourcePrefix
-	/*
-		watch-list机制server端的源头，watch-list机制的详情可以查看k8s v1.3.6中的注解
-	*/
 
 	newListFunc := func() runtime.Object { return &api.PodList{} }
 	/*
