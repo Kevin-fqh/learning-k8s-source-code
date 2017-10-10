@@ -213,7 +213,7 @@ func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 }
 ```
 
-- newETCD2Client
+- newETCD2Client  
 `newETCD2Client`函数需要注意一下的是，这里面有个超时属性`HeaderTimeoutPerRequest`，感觉应该进行设置。这个和Apiserver和etcd之间的连接超时有关系，还是TCP机制相关，比较复杂。
 ```go
 func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client, error) {
@@ -230,7 +230,7 @@ func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client
 	return cli, nil
 }
 ```
-- NewEtcdStorage
+- NewEtcdStorage  
 主要是通过`type etcdHelper struct`来提供操作etcd的接口
 ```go
 // Creates a new storage interface from the client
