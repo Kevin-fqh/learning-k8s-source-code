@@ -13,6 +13,11 @@
 
 <!-- END MUNGE: GENERATED_TOC -->
 
+Apiserver针对每一类资源(pod、service、replication controller),都会与etcd建立一个连接。
+本文就是主要介绍Apiserver如何建立与etcd的连接，获取使用etcd的opt的，从而对资源进行操作。
+然后还会介绍具体某个Storage（如podStorage）的使用方法。
+最后介绍怎么判断一个Storage实现了哪些接口。
+
 还是从`/pkg/master/master.go`的`func (c completedConfig) New() (*Master, error)`函数开始
 
 ## type restOptionsFactory struct

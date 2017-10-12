@@ -468,7 +468,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 至此，关于StorageWithCacher和UndecoratedStorage已经介绍完毕，是Apiserver和etcd连接的两种接口。
 
 需要记住其应用是在`/pkg/registry/core/pod/etcd/etcd.go中的func NewStorage=>storageInterface, dFunc := opts.Decorator(...)｀。
-结合两边来看，就会对Apiserver和如何建立与etcd的连接，有个清楚的认识。
+结合两边来看，就会对Apiserver和如何建立与etcd的连接，有个清晰的认识。
 
 
 
