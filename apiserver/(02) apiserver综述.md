@@ -81,5 +81,22 @@ API注册的入口函数有两个： m.InstallAPIs 和 m.InstallLegacyAPI。
 这两个函数分别用于注册"/api"和"/apis"的API,这里先拿InstallLegacyAPI进行介绍。
 这些接口都是在config.Complete().New()函数中被调用
 
+## Storage机制
+Apiserver针对每一类资源(pod、service、replication controller),都会与etcd建立一个连接,获取该资源的opt。
+所有资源都定义了restful实现。
+Apiserver正是通过这个opt去操作对应的资源。
+
+## Apiserver端List-Watch机制
+什么是watch?kubelet、kube-controller-manager、kube-scheduler需要监控各种资源(pod、service等)的变化，
+当这些对象发生变化时(add、delete、update)，kube-apiserver能够主动通知这些组件。这是Client端的Watch实现。
+
+Apiserver端的Watch机制是建立在etcd的Watch基础上的。
+etcd的watch是没有过滤功能的，而kube-apiserver增加了过滤功能。
+
+什么是过滤功能？，比如说kubelet只对调度到本节点上的pod感兴趣，也就是pod.host=node1；
+而kube-scheduler只对未被调度的pod感兴趣，也就是pod.host=”“。
+etcd只能watch到pod的add、delete、update。
+kube-apiserver则增加了过滤功能，将订阅方感兴趣的部分资源发给订阅方。
+
 ## 参考
 [如何扩展Kubernetes管理的资源对象](http://dockone.io/article/2405)
