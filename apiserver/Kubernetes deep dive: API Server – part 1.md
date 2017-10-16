@@ -1,5 +1,17 @@
 # Kubernetes deep dive: API Server – part 1
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [引言](#引言)
+  - [API Server](#api-server)
+  - [术语](#术语)
+    - [Kind](#kind)
+	- [API Group](#api-group)
+	- [Version](#version)
+	- [Request Flow and Processing](#request-flow-and-processing)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## 引言
 如果你对Kubernetes的内部机制感兴趣，以及如何调试k8s，那么这篇博客文章系列是为您而设。
 此外，如果希望扩展Kubernetes或开始贡献项目，你可能会从中受益。
