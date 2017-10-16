@@ -45,7 +45,7 @@ Kubernetes API是一个具有JSON作为主序列化schema的HTTP API，但它也
 
 展望未来，我们将专注于批处理操作。在Kubernetes 1.5中，存在两个版本的批处理操作：`/apis/batch/v1` 和 `/apis/batch/v2alpha1`，用于暴露不同实体的集合，可以被查询和操作。
 
-现在我们将注意力转向与API的一个示例性交互：
+现在展示与API进行交互的例子：
 ```yaml
 $ curl http://127.0.0.1:8080/apis/batch/v1
 {
@@ -107,7 +107,7 @@ $ curl http://127.0.0.1:8080/apis/batch/v2alpha1
   ]
 }
 ```
-通常，Kubernetes API通过标准HTTP动词POST，PUT，DELETE和GET with JSON 作为默认有效载荷，以给指定路径执行创建，更新，删除和检索操作。
+通常，Kubernetes API通过标准HTTP动词POST，PUT，DELETE和GET with JSON 作为默认有效载荷，在指定路径上执行创建，更新，删除和检索操作。
 
 大多数API对象区分对象的`期望状态`和`当前状态`。 specification是对`期望状态`的完整描述。
 
