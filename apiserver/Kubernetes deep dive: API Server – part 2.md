@@ -20,7 +20,7 @@ API Server本身是无状态的，是与分布式存储etcd直接对话的唯一
 为了协调分布式设置中的数据访问，etcd使用了Raft协议。
 在概念上，数据模型上支持的是key-value存储。
 在etcd2中，keys形成了一个层次结构。
-在etcd3中，引入了如下所示的平面模型，同时保持了与etcd2中分层键的兼容性：
+在etcd3中，引入了如下所示的平面模型，同时保持了与etcd2中`分层键key`的兼容性：
 ![etcd-101](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/etcd-101.png)
 
 使用容器化版本的etcd，我们可以创建上面的树，然后检索如下：
@@ -80,9 +80,9 @@ X-Raft-Term: 2
 
 ## Cluster state in etcd
 在Kubernetes中，etcd是控制平面的独立组件。
-直到Kubernetes 1.5.2，我们使用了etcd2，从此切换到etcd3。
+直到Kubernetes 1.5.2，我们都是使用etcd2，从此之后切换到etcd3。
 
-在Kubernetes 1.5.x etcd3仍然在v2 API模式下使用，并且向前转变为v3 API，包括所使用的数据模型。
+在Kubernetes 1.5.x etcd3仍然在v2 API模式下使用，并且可以向前转变为v3 API，包括所使用的数据模型。
 从开发人员的角度来看，影响不大，因为API Server负责与etcd进行交互，比较v2和v3的存储后端实现。
 但是，从群集管理员的角度来看，知道使用哪个etcd版本是很有必要的，因为在不同的etcd版本进行备份和恢复的操作是不一样的。
 
@@ -99,7 +99,7 @@ $ kube-apiserver -h
 ...
 ```
 
-Kubernetes将其objects以`JSON字符串`或者`[Protocol Buffers](https://developers.google.com/protocol-buffers/)（简称“protobuf”）`的格式存储在etcd中。
+Kubernetes将其objects以JSON字符或者[Protocol Buffers](https://developers.google.com/protocol-buffers/)（简称“protobuf”）的格式存储在etcd中。
 让我们来看一个具体的例子，etcd version 3.1.0：
 ```yaml
 $ cat pod.yaml
@@ -132,16 +132,17 @@ $ etcdctl get /registry/pods/apiserver-sandbox/webserver
 那么，从`kubectl create -f pod.yaml`开始，是如何最终存储到etcd中的？
 数据流如下图所示：
 ![API-server-serialization-overview](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/API-server-serialization-overview.png)
-1. 诸如kubectl的客户端提供一个desired object state，如Version v1中的YAML。
+1. 如kubectl一样的client端提供一个desired object state，如Version v1中的YAML。
 2. kubectl converts the YAML into JSON to send it over the wire.
-3. 在不同`version`之间的同一个`kind`，API Server可以进行无损转换，利用注释来存储在旧API Version中无法表达的信息。
-4. API Server将输入对象状态转换为`一个权威的存储版本`，具体取决于API Server版本本身，通常是最新的stable版本，例如v1。
+3. 在不同`version`中定义的同一个`kind`，API Server可以进行无损转换，利用注释来存储在旧API Version中无法表达的信息。
+4. API Server将输入的对象状态转换为`一个权威的存储版本`，具体取决于API Server版本本身，通常是最新的stable版本，例如v1。
 5. 在etcd的实际存储过程中，在某个关键字处，将其转换为具有JSON或protobuf编码的值。
 
-可以使用`--storage-media-type`对kube-apiserver的序列化进行配置，该选项默认为`application/vnd.kubernetes.protobuf`。以及用`--storage-versions`来设置每个Group的默认存储Version。
+可以使用`--storage-media-type`对kube-apiserver的序列化进行配置，该选项默认为`application/vnd.kubernetes.protobuf`。
+同样可以使用`--storage-versions`来设置每个Group的默认存储Version。
 
 下面来看看无损转换在实践中是如何工作。
-我们将使用类型为[Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)的Kubernetes对象。HPA有一个controller监督和更新ReplicationController，根据设定的利用率指标(utilization metrics)。
+我们使用类型为[Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)的Kubernetes对象。HPA有一个controller监督和更新ReplicationController，根据设定的利用率指标(utilization metrics)来进行更新。
 ```yaml
 $ cat registry-rc.yaml
 apiVersion: v1
@@ -162,7 +163,7 @@ spec:
         - name: registry
           image: registry:v1
 ```
-```json
+```yaml
 $ kubectl create -f registry-rc.yaml
 
 $ kubectl autoscale rc registry --min=2 --max=5 --cpu-percent=80
@@ -258,7 +259,7 @@ $ curl http://192.168.56.101:8080/apis/autoscaling/v1/namespaces/default/horizon
   }
 }
 ```
-用diff对两个进行对比
+用diff对上面两个输出进行对比
 ```
 $ diff -u hpa-v1beta1.json hpa-v1.json
 --- hpa-v1beta1.json	2017-10-16 06:59:48.603581169 -0400
@@ -306,15 +307,15 @@ In this registry, each version of kinds are defined along with how they can be c
 
 ![API-server-storage-flow](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/API-server-storage-flow.png)
 
-当API Server接收一个object时（比如来自与kubectl），它将从HTTP Path中获取期待的Version。
-它使用Scheme以正确的Version创建一个匹配的空对象，并使用JSON或protobuf解码器对HTTP payload进行转换。
+当API Server接收一个object时（比如来自与kubectl），它将从HTTP path中获取期待的Version。
+它使用Scheme以正确的Version创建一个与之匹配的空对象，并使用JSON或protobuf解码器对HTTP payload进行转换。
 解码器会将二进制payload转换为创建的对象。
 
 解码的对象是 one of the supported versions for the given type。 
-对于某些类型，在整个开发过程中可能会有多个version。
+对于某些`types`，在整个开发过程中可能会有多个version。
 为了避免出现问题，API Server必须要知道如何在每一对版本之间进行转换（例如，v1⇔v1alpha1，v1⇔v1beta1，v1beta1⇔v1alpha1）。
 API Server为每个 types 使用一个特殊的`internal version`。 
-一个type的internal version 是该type的所有version的superset，具有所有version的功能。
+一个type的internal version 是该type的所有version的superset，它具有所有version的功能。
 Decoder会首先把the incoming object转换到internal version，然后将其转换为the storage version，如下所示：
 ```
 v1beta1 ⇒ internal ⇒ v1
@@ -364,7 +365,7 @@ Validation不会查看该type的其他实例，甚至其它type的实例。
 2. [Upgrading to a different API version](https://kubernetes.io/docs/tasks/administer-cluster/cluster-management/#upgrading-to-a-different-api-version)
 
 
-下一篇文章，我们将讨论如何使用`[Custom Resource Definitions](https://github.com/kubernetes/features/issues/95)`和`User API Servers`来扩展Kubernetes API。
+下一篇文章，我们将讨论如何使用[Custom Resource Definitions](https://github.com/kubernetes/features/issues/95)和`User API Servers`来扩展Kubernetes API。
 
 ## 参考
 译自[Kubernetes Deep Dive: API Server – Part 2](https://blog.openshift.com/kubernetes-deep-dive-api-server-part-2/)
