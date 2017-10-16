@@ -168,16 +168,16 @@ An API Group, a Version and a Resource (GVR) uniquely defines a HTTP path:
 4. 在API Group中注册的handler负责接收HTTP请求和上下文context（如用户，权限等），并从storage中获取请求的object。
 
 
-`DefaultBuildHandlerChain`请参阅/pkg/genericapiserver/config.go，或[config.go](#https://github.com/kubernetes/apiserver/blob/master/pkg/server/config.go)
+`DefaultBuildHandlerChain`请参阅/pkg/genericapiserver/config.go，或[config.go](https://github.com/kubernetes/apiserver/blob/master/pkg/server/config.go)
 
-在API Group中注册handler 请参阅[groupversion.go](#https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/groupversion.go)和[installer.go](#https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/installer.go)
+在API Group中注册handler 请参阅[groupversion.go](https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/groupversion.go)和[installer.go](https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/installer.go)
 
 完整的流程如下图所示：
 ![API-server-overview](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/API-server-overview.png)
 
 再次注意，为了简洁起见，我们省略了上面图中HTTP路径的`$NAMESPACE`部分。
 
-现在我们来看一下[config.go](#https://github.com/kubernetes/apiserver/blob/master/pkg/server/config.go)中的DefaultBuildHandlerChain()设置的过滤器：
+现在我们来看一下[config.go](https://github.com/kubernetes/apiserver/blob/master/pkg/server/config.go)中的DefaultBuildHandlerChain()设置的过滤器：
 - WithRequestInfo()，将RequestInfo附加到上下文中
 - WithMaxInFlightLimit()，限制了正在运行中的请求数
 - WithTimeoutForNonLongRunningRequests()，设置一个non-long-running requests超时。 大多数GET，PUT，POST，DELETE请求是non-long-running requests。 而watches and proxy requests则是long-running requests。
