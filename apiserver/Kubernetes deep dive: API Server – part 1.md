@@ -173,7 +173,7 @@ An API Group, a Version and a Resource (GVR) uniquely defines a HTTP path:
 在API Group中注册handler 请参阅[groupversion.go](https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/groupversion.go)和[installer.go](https://github.com/kubernetes/apiserver/blob/master/pkg/endpoints/installer.go)
 
 完整的流程如下图所示：
-![API-server-overview](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/API-server-overview.png)
+![API-server-flow](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/API-server-flow.png)
 
 再次注意，为了简洁起见，我们省略了上面图中HTTP路径的`$NAMESPACE`部分。
 
