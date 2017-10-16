@@ -23,7 +23,7 @@
 在概念层面上，Kubernetes由一堆不同角色的节点组成。 主节点上的控制平面由API服务器，控制器管理器和调度程序组成。 API服务器是中央管理实体，是与分布式存储组件等直接对话的唯一组件。 它提供以下核心功能：
 
 Kubernetes由一堆不同角色的node组成。master节点上的控制平面由 API Server, the Controller Manager and Scheduler(s)组成。 API Server是中心管理实体，是与分布式存储组件etcd直接对话的唯一组件。它提供以下核心功能：
-- 提供［Kubernetes API］(https://kubernetes.io/docs/concepts/overview/kubernetes-api/)，由工作节点以及由kubectl使用
+- 提供[Kubernetes API](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)，由工作节点以及由kubectl使用
 - 代理群集组件，如Kubernetes UI
 - 允许操纵对象的状态，例如pod和services
 - 保持分布式存储（etcd）中对象的状态
@@ -192,6 +192,8 @@ An API Group, a Version and a Resource (GVR) uniquely defines a HTTP path:
 
 ## 参考
 译自[Kubernetes deep dive](https://blog.openshift.com/kubernetes-deep-dive-api-server-part-1/)
+
+[Kubernetes API](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)
 
 
 
