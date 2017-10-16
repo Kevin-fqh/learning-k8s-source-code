@@ -16,14 +16,14 @@
 如果你对Kubernetes的内部机制感兴趣，以及如何调试k8s，那么这篇博客文章系列是为您而设。
 此外，如果希望扩展Kubernetes或开始贡献项目，你可能会从中受益。
 
-在本文中，我们从介绍Kubernetes API Server开始，较少一些术语并解释API请求流程。
-未来的帖子将介绍API Server的存储相关主题和扩展点。
+在本文中，我们从介绍Kubernetes API Server开始，然后介绍一些术语并解释API请求流程。
+未来将介绍API Server的存储相关主题和扩展点。
 
 ## API Server
 在概念层面上，Kubernetes由一堆不同角色的节点组成。 主节点上的控制平面由API服务器，控制器管理器和调度程序组成。 API服务器是中央管理实体，是与分布式存储组件等直接对话的唯一组件。 它提供以下核心功能：
 
 Kubernetes由一堆不同角色的node组成。master节点上的控制平面由 API Server, the Controller Manager and Scheduler(s)组成。 API Server是中心管理实体，是与分布式存储组件etcd直接对话的唯一组件。它提供以下核心功能：
-- 提供Kubernetes API，由工作节点以及由kubectl使用
+- 提供［Kubernetes API］(https://kubernetes.io/docs/concepts/overview/kubernetes-api/)，由工作节点以及由kubectl使用
 - 代理群集组件，如Kubernetes UI
 - 允许操纵对象的状态，例如pod和services
 - 保持分布式存储（etcd）中对象的状态
