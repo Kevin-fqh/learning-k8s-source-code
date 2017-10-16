@@ -176,7 +176,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 				==>func NewStorage
 
 		restOptionsGetter(api.Resource("pods"))该步完成了opts的创建，该opt在具体的资源watch-list中很重要
-		restOptionsGetter的由来可以查看/pkg/master/master.go中的master的func (c completedConfig) New() (*Master, error)
+		
+		restOptionsGetter的由来可以查看/pkg/master/master.go中的master的
+		==>func (c completedConfig) New() (*Master, error)
+			==>func (f restOptionsFactory) NewFor
 	*/
 	podStorage := podetcd.NewStorage(
 		restOptionsGetter(api.Resource("pods")),

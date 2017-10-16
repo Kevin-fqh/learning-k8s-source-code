@@ -341,9 +341,9 @@ type CacherConfig struct {
 ```
 
 ## func NewCacherFromConfig 创建cacher
-`func NewCacherFromConfig`根据给定的配置，创建一个新的Cacher，负责服务WATCH和LIST内部缓存请求，并在后台更新缓存。这也是本文的重点。
+`func NewCacherFromConfig`根据给定的配置，创建一个新的Cacher，负责服务WATCH和LIST内部缓存请求，并在后台更新缓存。
 
-是List-Watch机制的核心数据结构。
+Cacher是List-Watch机制的核心数据结构。
 
 ```go
 // Create a new Cacher responsible from service WATCH and LIST requests from its
@@ -361,7 +361,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc)
 	/*
 		对config.Storage进行list和watch
-		config.Storage是数据源（可以简单理解为etcd、带cache的etcd）
+		config.Storage是数据源（可以简单理解为etcd、带cache的etcd），一个资源的etcd handler
 	*/
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
@@ -462,7 +462,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	return cacher
 }
 ```
-这里不对List－Watch机制进行展开介绍。
+这里先不对List－Watch机制进行展开介绍。
 
 ## 总结
 至此，关于StorageWithCacher和UndecoratedStorage已经介绍完毕，是Apiserver和etcd连接的两种接口。
