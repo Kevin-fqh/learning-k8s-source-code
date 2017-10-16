@@ -136,7 +136,7 @@ $ etcdctl get /registry/pods/apiserver-sandbox/webserver
 2. kubectl converts the YAML into JSON to send it over the wire.
 3. 在不同`version`中定义的同一个`kind`，API Server可以进行无损转换，利用注释来存储在旧API Version中无法表达的信息。
 4. API Server将输入的对象状态转换为`一个权威的存储版本`，具体取决于API Server版本本身，通常是最新的stable版本，例如v1。
-5. 在etcd的实际存储过程中，在某个关键字处，将其转换为具有JSON或protobuf编码的值。
+5. 在etcd的实际存储过程中，对于一个key，会将其转换为JSON或protobuf编码。
 
 可以使用`--storage-media-type`对kube-apiserver的序列化进行配置，该选项默认为`application/vnd.kubernetes.protobuf`。
 同样可以使用`--storage-versions`来设置每个Group的默认存储Version。
