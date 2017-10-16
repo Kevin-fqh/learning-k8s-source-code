@@ -193,7 +193,6 @@ An API Group, a Version and a Resource (GVR) uniquely defines a HTTP path:
 ## 参考
 译自[Kubernetes deep dive](https://blog.openshift.com/kubernetes-deep-dive-api-server-part-1/)
 
-[Kubernetes API](https://kubernetes.io/docs/concepts/overview/kubernetes-api/)
 
 
 
