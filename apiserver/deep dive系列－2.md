@@ -80,7 +80,7 @@ X-Raft-Term: 2
 
 ## Cluster state in etcd
 在Kubernetes中，etcd是控制平面的独立组件。
-直到Kubernetes 1.5.2，我们都是使用etcd2，从此之后切换到etcd3。
+直到Kubernetes 1.5.2，我们都是使用etcd2，之后就切换到etcd3了。
 
 在Kubernetes 1.5.x etcd3仍然在v2 API模式下使用，并且可以向前转变为v3 API，包括所使用的数据模型。
 从开发人员的角度来看，影响不大，因为API Server负责与etcd进行交互，比较v2和v3的存储后端实现。
@@ -142,7 +142,7 @@ $ etcdctl get /registry/pods/apiserver-sandbox/webserver
 同样可以使用`--storage-versions`来设置每个Group的默认存储Version。
 
 下面来看看无损转换在实践中是如何工作。
-我们使用类型为[Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)的Kubernetes对象。HPA有一个controller监督和更新ReplicationController，根据设定的利用率指标(utilization metrics)来进行更新。
+我们使用type为[Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)的Kubernetes对象。HPA有一个controller监督和更新ReplicationController，根据设定的利用率指标(utilization metrics)来进行更新。
 ```yaml
 $ cat registry-rc.yaml
 apiVersion: v1
