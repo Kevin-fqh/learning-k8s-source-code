@@ -1,7 +1,18 @@
 # Convertor的使用
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [FieldMatchingFlags](#fieldmatchingflags)
+  - [Converter](#converter)
+  - [Demo－byteSlice](#demo－byteslice)
+  - [Demo－MismatchedTypes](#demo－mismatchedtypes)
+  - [Demo-DefaultConvert](#demo-defaultconvert)
+  - [Demo-DeepCopy](#demo-deepcopy)
+<!-- END MUNGE: GENERATED_TOC -->
+
+Scheme中用到了Convertor，本文展示一些简单Demo来进行用法说明。
 ## FieldMatchingFlags
-设置了转换模式，FieldMatchingFlags表示了哪些struct中的字段可以被copy, 可以用“｜”来设置多个。
+声明转换模式，FieldMatchingFlags表示了哪些struct中的字段可以被copy, 可以用“｜”来设置多个。
 ```go
 // FieldMatchingFlags contains a list of ways in which struct fields could be
 // copied. These constants may be | combined.
@@ -36,6 +47,7 @@ const (
 )
 ```
 ## Converter
+Converter knows how to convert one type to another.
 - type Converter struct
 ```go
 type Converter struct {
@@ -116,8 +128,8 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, met
 }
 ```
 
-## Daemon－byteSlice
-来个类型相同的时候，其实就是直接copy
+## Demo－byteSlice
+两个变量类型相同的时候，其实就是直接copy
 ```go
 package main
 
@@ -151,8 +163,8 @@ func main() {
 [1 2 3]
 ```
 
-## Daemon－MismatchedTypes
-类型不同时，需往Converter中注册转换函数,否则会报错
+## Demo－MismatchedTypes
+两个变量类型不同时，需往Converter中注册转换函数,否则会报错
 ```go
 package main
 
@@ -178,7 +190,7 @@ func main() {
 				return err
 			} else {
 				*out = str
-				return nil
+				return nil //或者使用 return s.Convert(&in.Baz, &out.Baz, 0)
 			}
 		},
 	)
@@ -206,8 +218,8 @@ func main() {
 ```
 如果src := []string{"5", "6"}，输出也不会改变，因为转换函数仅仅转换了(*in)[0]
 
-## Daemon-DefaultConvert
-两边filed一样时，不需要进行显式转换说明，如下面例子中的“Baz”
+## Demo-DefaultConvert
+两边filed一样时，不需要进行显式转换说明，如下面例子中的“Baz”。
 对于dest中某些不存在与src的字段，如果不进行显示说明转换办法，那么dest的字段将默认设置为该field的默认值。
 ```go
 package main
@@ -272,7 +284,7 @@ func main() {
 {Bar:hello Baz:3}
 ```
 
-## Daemon-DeepCopy
+## Demo-DeepCopy
 x和y都属于同一种类型type A struct，不需要显式声明转换函数
 ```go
 package main
@@ -336,13 +348,6 @@ func main() {
 main.A{Foo:(*string)(0xc4200721d0), Bar:[]string{"bar", "fff"}, Baz:(*string)(0xc4200721e0), Qux:map[string]string{"qux":"qux"}}
 main.A{Foo:(*string)(0xc420072230), Bar:[]string{"bar", "fff"}, Baz:(*string)(0xc4200722f0), Qux:map[string]string{"qux":"qux"}}
 ```
-
-## Daemon-CallsRegisteredFunctions
-
-```go
-
-```
-
 
 ## 参考
 /kubernetes-1.5.2/pkg/conversion/converter_test.go
