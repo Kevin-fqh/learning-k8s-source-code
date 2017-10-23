@@ -22,6 +22,7 @@ kubernetes会通过EventCorrelator对event进行聚合和去重的处理，以�
 kubernetes是一个`level driven(state)`的系统，并非一个`edge driven(event)`系统。
 也就是会说，k8s不是一接收到信号，就会立马触发某个事件。
 而是，系统声明了这么一个信息，然后在未来一段时间里面，系统会根据这个信息做出相应的处理，这是一种`声明式`的处理方式。
+
 ![kubernetes-controller](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/kubernetes-controller.png)
 
 ## part 3
