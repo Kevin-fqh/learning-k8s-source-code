@@ -1,4 +1,4 @@
-# The end of kubectl
+# The summary of kubectl
 
 ## part 1
 kubectl是基于package cobra来进行命令的构造。
@@ -19,12 +19,13 @@ Broadcaster广播机制也是list-watch机制的一种实现方式。
 各个组件都会向Apiserver发送自身产生的event。
 kubernetes会通过EventCorrelator对event进行聚合和去重的处理，以避免由于event的数据量过大而造成系统的不稳定。
 
-kubernetes是一个`水平线`的系统，并非一个`垂直线`系统。
+kubernetes是一个`level driven(state)`的系统，并非一个`edge driven(event)`系统。
 也就是会说，k8s不是一接收到信号，就会立马触发某个事件。
 而是，系统声明了这么一个信息，然后在未来一段时间里面，系统会根据这个信息做出相应的处理，这是一种`声明式`的处理方式。
+![kubernetes-controller](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/kubernetes-controller.png)
 
 ## part 3
-最后通过的client-go的学习，可以更加简易地了解到kubernetes的内部核心机制。
+最后通过的client-go的使用，可以更加简易地了解到kubernetes的内部核心机制。
 RESTClient是Kubernetes最基础的Client，封装了一个http client。 restclient 是dynamic client和clientset的基础。
 重点学习和掌握clientset的用法，根据其衍生出各种实体资源的Client(PodClient...)。
 
