@@ -622,8 +622,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 }
 ```
 
-- List和Watch
-cacherListerWatcher的List和Watch
+- cacherListerWatcher的List和Watch
 ```go
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) List(options api.ListOptions) (runtime.Object, error) {
@@ -696,7 +695,7 @@ func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion stri
 	return w, nil
 }
 ```
-可以发现这是建立在etcd的watch基础上的，关于etcd的watcher，将在另外一篇文章中进行讲述。
+可以发现这是建立在etcd的watch基础上的，关于etcd的watcher，将在[EtcdWatcher]()一文中进行讲述。
 
 - 启动reflect的watchHandler函数
 ```go

@@ -246,7 +246,10 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quor
 	return &etcdHelper{
 		// 创建一个httpMembersAPI变量，附带很多方法
 		etcdMembersAPI: etcd.NewMembersAPI(client),
-		// 创建一个httpKeysAPI变量，同样附带各类方法
+		/*
+			创建一个httpKeysAPI变量，同样附带各类方法
+			后面从etcd watch数据的时候，就是用etcdKeysAPI的接口
+		*/
 		etcdKeysAPI: etcd.NewKeysAPI(client),
 		// 编解码使用
 		codec:     codec,
