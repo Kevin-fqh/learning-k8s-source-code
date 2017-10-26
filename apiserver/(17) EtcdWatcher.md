@@ -10,6 +10,8 @@
 
 <!-- END MUNGE: GENERATED_TOC -->
 
+本文会根据event的数据流向来对EtcdWatcher进行学习。
+
 ## type etcdWatcher struct定义
 ```go
 // etcdWatcher converts a native etcd watch to a watch.Interface.
@@ -138,6 +140,7 @@ go w.etcdWatch(ctx, h.etcdKeysAPI, key, watchRV)
 ```
 
 etcdWatch函数负责和etcdhelper打交道，调用etcdhelper的Watch，获取event。
+
 然后把watch到的event传到channel etcdIncoming。
 这里完成了etcd-->channel etcdIncoming
 ```go
@@ -221,6 +224,7 @@ func (w *etcdWatcher) etcdWatch(ctx context.Context, client etcd.KeysAPI, key st
 func (w *etcdWatcher) translate()定义了一个死循环，用select语句来处理Error、用户主动Stop、正常三种信号。
 
 负责消费etcdIncoming channel的event，调用sendResult，根据event信息中的动作类型(EtcdCreate, EtcdGet...)，进行分发。
+
 这里完成了channel etcdIncoming-->channel outgoging
 ```go
 // translate pulls stuff from etcd, converts, and pushes out the outgoing channel. Meant to be
