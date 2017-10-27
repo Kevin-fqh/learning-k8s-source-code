@@ -23,6 +23,10 @@ etcd的watch是没有过滤功能的，而kube-apiserver增加了过滤功能。
 etcd只能watch到pod的add、delete、update。
 kube-apiserver则增加了过滤功能，将订阅方感兴趣的部分资源发给订阅方。
 
+Event数据流向如下：
+1. 从etcd-->Cacher，是一个watchCache，存储apiserver从etcd那里watch到的对象。
+2. 结合etcd和Cacher的resourceVersion进行对比，形成一个WatchEvent，分发到各个观察者watcher中
+
 ## 引子
 前面/pkg/storage/cacher.go提到`func NewCacherFromConfig`根据给定的配置，创建一个新的Cacher，负责服务WATCH和LIST内部缓存请求，并在后台更新缓存。分析其流程，如下：
 1. 新建一个watchCache，用来存储apiserver从etcd那里watch到的对象
@@ -442,6 +446,10 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 关于type Reflector struct实现的方法在后面用到的时候会进行介绍。
 
 ## 启动Cacher
+分析其流程如下：
+1. 首先会通过terminateAllWatchers注销所有的cachewatcher,因为这个时候apiserver还处于初始化阶段，因此不可能接受其他组件的watch，也就不可能有watcher。
+2. 然后调用c.reflector.ListAndWatch函数，完成前面说过的功能：reflector主要将apiserver组件从etcd中watch到的资源存储到watchCache中。
+
 ```go
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// The 'usable' lock is always 'RLock'able when it is safe to use the cache.
@@ -695,23 +703,350 @@ func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion stri
 	return w, nil
 }
 ```
-可以发现这是建立在etcd的watch基础上的，关于etcd的watcher，将在[EtcdWatcher]()一文中进行讲述。
+可以发现这是建立在etcd的watch基础上的，关于etcd的watch，将在[EtcdWatcher]()一文中进行讲述。
 
-- 启动reflect的watchHandler函数
+- 启动reflect的watchHandler函数  
+func watchHandler watches w and keeps *resourceVersion up to date。
+
+将event对象从channel outgoing中读取出来，然后根据event.Type去操作r.store，即操作type watchCache struct。
 ```go
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, errc chan error, stopCh <-chan struct{}) error {
+	start := time.Now()
+	eventCount := 0
 
+	// Stopping the watcher should be idempotent and if we return from this function there's no way
+	// we're coming back in with the same watch interface.
+	defer w.Stop()
+
+loop:
+	for {
+		select {
+		case <-stopCh:
+			return errorStopRequested
+		case err := <-errc:
+			return err
+		case event, ok := <-w.ResultChan():
+			/*
+				ResultChan()的返回值是channel outgoing  消费者
+				==>定义在/pkg/storage/etcd/etcd_watcher.go
+					==>func (w *etcdWatcher) ResultChan() <-chan watch.Event
+			*/
+			if !ok {
+				break loop
+			}
+			if event.Type == watch.Error {
+				return apierrs.FromObject(event.Object)
+			}
+			if e, a := r.expectedType, reflect.TypeOf(event.Object); e != nil && e != a {
+				utilruntime.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", r.name, e, a))
+				continue
+			}
+			meta, err := meta.Accessor(event.Object)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
+				continue
+			}
+			newResourceVersion := meta.GetResourceVersion()
+			switch event.Type {
+			case watch.Added:
+				/*
+					r.store的初始化是在/pkg/storage/cacher.go
+						==>func NewCacherFromConfig(config CacherConfig) *Cacher
+							==>watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc)
+					那么Add函数定义在/pkg/storage/watch_cache.go
+						==>func (w *watchCache) Add(obj interface{}) error
+
+					传进去的参数是event.Object，
+					Add这些函数里面会将object重新包装成event
+
+					上面的描述是针对apiserver端的，所以其r.store的初始化是func NewCacherFromConfig(config CacherConfig) *Cacher。
+					但对于kubelet而言，其r.store的初始化和apiserver并不一样！
+					****
+					****
+					kubelet的reflector的初始化是在
+					==>/pkg/kubelet/config/apiserver.go
+						==>func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{})
+							==>cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
+					其r.store是cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc)，
+					类型是type UndeltaStore struct
+					那么其Add函数也就是定义在/pkg/client/cache/undelta_store.go
+						==>func (u *UndeltaStore) Add(obj interface{})
+
+					可以比较以下两种store类型的Add函数的区别和相同之处：
+						相同：最后都会调用定义在pkg/client/cache/store.go中的Add函数
+								==>func (c *cache) Add(obj interface{}) error
+				*/
+				r.store.Add(event.Object)
+			case watch.Modified:
+				r.store.Update(event.Object)
+			case watch.Deleted:
+				// TODO: Will any consumers need access to the "last known
+				// state", which is passed in event.Object? If so, may need
+				// to change this.
+				r.store.Delete(event.Object)
+			default:
+				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
+			}
+			*resourceVersion = newResourceVersion
+			r.setLastSyncResourceVersion(newResourceVersion)
+			eventCount++
+		}
+	}
+
+	watchDuration := time.Now().Sub(start)
+	if watchDuration < 1*time.Second && eventCount == 0 {
+		glog.V(4).Infof("%s: Unexpected watch close - watch lasted less than a second and no items received", r.name)
+		return errors.New("very short watch")
+	}
+	glog.V(4).Infof("%s: Watch close - %v total %v items received", r.name, r.expectedType, eventCount)
+	return nil
+}
 ```
 
+这里需要注意的是r.store的初始化，apiserver和kubelet的初始化是不一样的，所以对应的r.store也不一样。
 
+以apiserver的Add函数为例，定义在`pkg/storage/watch_cache.go`
+```go
+// Add takes runtime.Object as an argument.
+func (w *watchCache) Add(obj interface{}) error {
+	object, resourceVersion, err := objectToVersionedRuntimeObject(obj)
+	if err != nil {
+		return err
+	}
+	/*
+		把入口参数object重新包装成event
+	*/
+	event := watch.Event{Type: watch.Added, Object: object}
 
+	/*
+		定义函数面值f， w.store.Add(elem)定义在是pkg/client/cache/store.go
+			==>func (c *cache) Add(obj interface{}) error
+	*/
+	f := func(elem *storeElement) error { return w.store.Add(elem) }
+	/*
+		调用func (w *watchCache) processEvent
+	*/
+	return w.processEvent(event, resourceVersion, f)
+}
+```
 
+- processEvent处理event  
+继续查看processEvent函数，其流程如下：
 
+1. 将event封装成watchCacheEvent
+2. 调用w.onEvent(watchCacheEvent)，后面会通知对应的watcher
+3. 调用updateFunc(elem)往Cache里面insert一个Event,  这里的updateFunc就是上面Add函数的`f := func(elem *storeElement) error { return w.store.Add(elem) }`。 **也就是说这里完成了Event从etcd流向Cache。**
 
+```go
+func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
+	key, err := w.keyFunc(event.Object)
+	if err != nil {
+		return fmt.Errorf("couldn't compute key: %v", err)
+	}
+	elem := &storeElement{Key: key, Object: event.Object}
 
+	// TODO: We should consider moving this lock below after the watchCacheEvent
+	// is created. In such situation, the only problematic scenario is Replace(
+	// happening after getting object from store and before acquiring a lock.
+	// Maybe introduce another lock for this purpose.
+	w.Lock()
+	defer w.Unlock()
+	/*
+		根据elem获取该enevt的previous
+	*/
+	previous, exists, err := w.store.Get(elem)
+	if err != nil {
+		return err
+	}
+	var prevObject runtime.Object
+	if exists {
+		prevObject = previous.(*storeElement).Object
+	}
+	/*
+		将event封装成watchCacheEvent
+	*/
+	watchCacheEvent := watchCacheEvent{
+		Type:            event.Type,
+		Object:          event.Object,
+		PrevObject:      prevObject, //和elem相关
+		Key:             key,
+		ResourceVersion: resourceVersion,
+	}
+	if w.onEvent != nil {
+		/*
+			调用onEvent函数面值，其赋值是在
+				==>/pkg/storage/cacher.go
+					==>func NewCacherFromConfig(config CacherConfig) *Cacher
+						==>watchCache.SetOnEvent(cacher.processEvent)
 
+			type Cacher struct的channel incoming的生产者
+			其消费地方在于/pkg/storage/cacher.go
+			==>func (c *Cacher) dispatchEvents()
+		*/
+		w.onEvent(watchCacheEvent)
+	}
+	w.updateCache(resourceVersion, &watchCacheEvent)
+	w.resourceVersion = resourceVersion
+	w.cond.Broadcast()
+	/*
+		调用updateFunc更新store，往cache里面insert一个Event
+	*/
+	return updateFunc(elem)
+}
+```
 
+查看updateFunc里面的Add函数，在pkg/client/cache/store.go
+```go
+// Add inserts an item into the cache.
+func (c *cache) Add(obj interface{}) error {
+	key, err := c.keyFunc(obj)
+	if err != nil {
+		return KeyError{obj, err}
+	}
+	c.cacheStorage.Add(key, obj)
+	return nil
+}
+```
 
+至此Event从etcd流向WatchCache的过程已经基本清晰。
 
+## Event流向各个watcher组件
+那么后面的重点就来到了`w.onEvent(watchCacheEvent)`，其最终是调用`/pkg/storage/cacher.go`中的`func (c *Cacher) processEvent(event watchCacheEvent)`。
+
+这个在上面已经介绍过了，里面会把一个Event发送到channel incoming中，这是一个生产者。
+
+那么对应的消费者在哪呢？在`func (c *Cacher) dispatchEvents()`中。
+```go
+func (c *Cacher) dispatchEvents() {
+	for {
+		select {
+		/*
+			type Cacher struct的channel incoming的消费者
+		*/
+		case event, ok := <-c.incoming:
+			if !ok {
+				return
+			}
+			c.dispatchEvent(&event)
+		case <-c.stopCh:
+			return
+		}
+	}
+}
+
+func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
+	/*
+		获取event中的value、前一个event的value
+	*/
+	triggerValues, supported := c.triggerValues(event)
+
+	// TODO: For now we assume we have a given <timeout> budget for dispatching
+	// a single event. We should consider changing to the approach with:
+	// - budget has upper bound at <max_timeout>
+	// - we add <portion> to current timeout every second
+	timeout := time.Duration(250) * time.Millisecond
+
+	/*
+	   RWMutex提供了四个方法：
+	   func (*RWMutex) Lock  写锁定
+	   func (*RWMutex) Unlock  写解锁
+	   func (*RWMutex) RLock  读锁定
+	   func (*RWMutex) RUnlock  读解锁
+	*/
+	c.Lock()
+	defer c.Unlock()
+	// Iterate over "allWatchers" no matter what the trigger function is.
+	/*
+		对Cacher中的watchers.allWatchers进行遍历，
+		把event 发送到所有的watcher中
+	*/
+	for _, watcher := range c.watchers.allWatchers {
+		watcher.add(event, &timeout)
+	}
+	if supported {
+		// Iterate over watchers interested in the given values of the trigger.
+		for _, triggerValue := range triggerValues {
+			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
+				watcher.add(event, &timeout)
+			}
+		}
+	} else {
+		// supported equal to false generally means that trigger function
+		// is not defined (or not aware of any indexes). In this case,
+		// watchers filters should generally also don't generate any
+		// trigger values, but can cause problems in case of some
+		// misconfiguration. Thus we paranoidly leave this branch.
+
+		// Iterate over watchers interested in exact values for all values.
+		for _, watchers := range c.watchers.valueWatchers {
+			for _, watcher := range watchers {
+				watcher.add(event, &timeout)
+			}
+		}
+	}
+}
+```
+
+来看看`watcher.add(event, &timeout)`函数，是如何把event分发到一个`type cacheWatcher struct`的。
+```go
+func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
+	// Try to send the event immediately, without blocking.
+	/*
+		channel取不到值时，走default通道，就是select语句结束，继续执行后续部分
+		如果取到值，直接return
+		这里完成event的分发，channel input的生产者，
+		其对应的消费者在type cacheWatcher struct
+		==>/pkg/storage/cacher.go
+			==>func newCacheWatcher
+				==>func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uint64)
+	*/
+	select {
+	case c.input <- *event:
+		return
+	default:
+	}
+
+	// OK, block sending, but only for up to <timeout>.
+	// cacheWatcher.add is called very often, so arrange
+	// to reuse timers instead of constantly allocating.
+	/*
+		func (c *cacheWatcher) add会很频繁地被调用，设置了一个定时器
+	*/
+	startTime := time.Now()
+
+	t, ok := timerPool.Get().(*time.Timer)
+	if ok {
+		t.Reset(*timeout)
+	} else {
+		t = time.NewTimer(*timeout)
+	}
+	defer timerPool.Put(t)
+
+	select {
+	case c.input <- *event:
+		stopped := t.Stop()
+		if !stopped {
+			// Consume triggered (but not yet received) timer event
+			// so that future reuse does not get a spurious timeout.
+			<-t.C
+		}
+	case <-t.C:
+		// This means that we couldn't send event to that watcher.
+		// Since we don't want to block on it infinitely,
+		// we simply terminate it.
+		c.forget(false)
+		c.stop()
+	}
+
+	if *timeout = *timeout - time.Since(startTime); *timeout < 0 {
+		*timeout = 0
+	}
+}
+```
+
+至此可以说Event已经分发到了各个Watcher组件了，后续各个Watcher组件会从channel input中获取到event。
+
+至于，各个Watcher是怎么创建的，后面会进行介绍。
 
 ## 总结
 kube-apiserver初始化时，建立对etcd的连接，并对etcd进行watch，将watch的结果存入watchCache。
