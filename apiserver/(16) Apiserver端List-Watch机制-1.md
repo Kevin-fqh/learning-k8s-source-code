@@ -8,7 +8,7 @@
   - [type Cacher struct](#type-cacher-struct)
   - [type Reflector struct](#type-reflector-struct)
   - [启动Cacher](#启动cacher)
-  - [Event流向各个watcher组件](#event流向各个watcher组件)
+  - [Event流向各个订阅者的watcher](#event流向各个订阅者的watcher)
 
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -916,7 +916,7 @@ func (c *cache) Add(obj interface{}) error {
 
 至此Event从etcd流向WatchCache的过程已经基本清晰。
 
-## Event流向各个watcher组件
+## Event流向各个订阅者的watcher
 那么后面的重点就来到了`w.onEvent(watchCacheEvent)`，其最终是调用`/pkg/storage/cacher.go`中的`func (c *Cacher) processEvent(event watchCacheEvent)`。
 
 这个在上面已经介绍过了，里面会把一个Event发送到channel incoming中，这是一个生产者。
@@ -1050,7 +1050,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
 }
 ```
 
-至此可以说Event已经分发到了各个Watcher组件了，后续各个Watcher组件会从channel input中获取到event。
+至此可以说Event已经分发到了各个订阅者的watcher中了，后续各个Watcher组件会从channel input中获取到event。
 
 至于，各个Watcher是怎么创建的，后面会进行介绍。
 
