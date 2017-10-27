@@ -2,8 +2,14 @@
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [UndecoratedStorage](#undecoratedstorage)
-  - [总结](#总结)
+  - [引子](#引子)
+  - [type watchCache struct](#type-watchcache-struct)
+  - [type cacherListerWatcher struct](#type-cacherlisterwatcher-struct)
+  - [type Cacher struct](#type-cacher-struct)
+  - [type Reflector struct](#type-reflector-struct)
+  - [启动Cacher](#启动cacher)
+  - [Event流向各个watcher组件](#event流向各个watcher组件)
+
 
 <!-- END MUNGE: GENERATED_TOC -->
 
