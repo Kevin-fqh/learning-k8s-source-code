@@ -498,9 +498,10 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 
 - 调用Reflector的ListAndWatch  
 分析其流程，如下：
-1. 执行list操作
-2. 执行watch操作
-3. 调用func (r *Reflector) watchHandler
+  1. 执行list操作
+  2. 执行watch操作
+  3. 调用func (r *Reflector) watchHandler
+
 ```go
 // ListAndWatch first lists all items and get the resource version at the moment of call,
 // and then use the resource version to watch.
