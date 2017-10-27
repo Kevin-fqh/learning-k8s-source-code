@@ -839,10 +839,9 @@ func (w *watchCache) Add(obj interface{}) error {
 
 - processEvent处理event  
 继续查看processEvent函数，其流程如下：
-
-1. 将event封装成watchCacheEvent
-2. 调用w.onEvent(watchCacheEvent)，后面会通知对应的watcher
-3. 调用updateFunc(elem)往Cache里面insert一个Event,  这里的updateFunc就是上面Add函数的`f := func(elem *storeElement) error { return w.store.Add(elem) }`。 **也就是说这里完成了Event从etcd流向Cache。**
+  1. 将event封装成watchCacheEvent
+  2. 调用w.onEvent(watchCacheEvent)，后面会通知对应的watcher
+  3. 调用updateFunc(elem)往Cache里面insert一个Event,  这里的updateFunc就是上面Add函数的`f := func(elem *storeElement) error { return w.store.Add(elem) }`。 **也就是说这里完成了Event从etcd流向Cache。**
 
 ```go
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
