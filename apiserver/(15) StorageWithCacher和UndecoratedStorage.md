@@ -231,7 +231,9 @@ func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client
 }
 ```
 - NewEtcdStorage  
-主要是通过`type etcdHelper struct`来提供操作etcd的接口
+主要是通过`type etcdHelper struct`来提供操作etcd的接口。
+
+**这个地方可以继续深挖，研究到etcd本身的watch机制。**
 ```go
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
@@ -248,7 +250,7 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quor
 		etcdMembersAPI: etcd.NewMembersAPI(client),
 		/*
 			创建一个httpKeysAPI变量，同样附带各类方法
-			后面从etcd watch数据的时候，就是用etcdKeysAPI的接口
+			后面从etcd watch数据的时候，就是用etcdKeysAPI的接口（这个地方可以继续深挖，研究到etcd本身的watch机制）
 		*/
 		etcdKeysAPI: etcd.NewKeysAPI(client),
 		// 编解码使用
