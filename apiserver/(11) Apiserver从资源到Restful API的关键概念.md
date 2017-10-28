@@ -1,5 +1,18 @@
 # Apiserver从资源到Restful API的关键概念
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [type RESTMapper interface](#type-restmapper-interface)
+  - [type DefaultRESTMapper struct](#type-defaultrestmapper-struct)
+  - [type GroupMeta struct](#type-groupmeta-struct)
+  - [type Scheme struct](#type-scheme-struct)
+  - [type APIRegistrationManager struct](#type-apiregistrationmanager-struct)
+  - [type Master struct](#type-master-struct)
+  - [type GenericAPIServer struct](#type-genericapiserver-struct)
+  - [type APIGroupInfo struct](#type-apigroupinfo-struct)
+  - [type APIGroupVersion struct](#type-apigroupversion-struct)
+
+<!-- END MUNGE: GENERATED_TOC -->
 
 ## type RESTMapper interface
 RESTMapper是一个interface，声明了一组函数接口。
@@ -121,6 +134,7 @@ type DefaultRESTMapper struct {
 type GroupMeta struct主要包括Group的元信息。
 其成员RESTMapper，与APIGroupVersion一样，
 其实APIGroupVersion的RESTMapper直接取值于GroupMeta的RESTMapper。
+
 一个Group可能包含多个版本，存储在GroupVersions中，
 而GroupVersion是默认存储在etcd中的版本。
 ```go
@@ -172,18 +186,20 @@ type GroupMeta struct {
 ```
 
 ## type Scheme struct
-type Scheme struct，用于API资源之间的序列化、反序列化、版本转换。Scheme里面还有好几个map，前面的结构体存储的都是unversioned.GroupVersionKind、unversioned.GroupVersion这些东西，这些东西本质上只是表示资源的字符串标识。
+type Scheme struct，用于API资源之间的序列化、反序列化、版本转换。 Scheme里面还有好几个map，前面的结构体存储的都是unversioned.GroupVersionKind、unversioned.GroupVersion这些东西，这些东西本质上只是表示资源的字符串标识。
+
 Scheme存储了对应着标志的具体的API资源的结构体，即reflect.Type=>定义在/pkg/api/types.go中如Pod、Service这些go Struct。
 
 RESTMapper管理的是GVR和GVK的关系，Scheme管理的是GVK和Type的关系。
 
 系统中所有的Type都要注册到Scheme中，目前系统只有一个Scheme，即api.Scheme,定义在/pkg/api/register.go。
-Scheme除了管理GVK和Type的关系，还管理有默认设置函数，并聚合了converter及cloner。
+
+Scheme除了管理GVK和Type的关系，还管理有默认设置函数，并聚合了converter及cloner。 
 从Scheme的定义可以看出，Scheme是个converter，也是个cloner。
 
-Kubernetes内部组件的流通的结构体值使用的是内部版本，所有的外部版本都要向内部版本进行转换；
-内部版本必须转换成外部版本才能进行输出。
-外部版本之间不能直接转换。
+Kubernetes内部组件的流通的结构体值使用的是内部版本，所有的外部版本都要向内部版本进行转换； 
+内部版本必须转换成外部版本才能进行输出。 
+外部版本之间不能直接转换。 
 etcd中存储的是带有版本的数据。
 
 ```go
