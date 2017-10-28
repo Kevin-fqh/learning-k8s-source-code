@@ -1146,7 +1146,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 
 5. 一个sharedIndexInformer中会生成多个type processorListener struct。
 
-6. Controller会把消息分发到各个listener中，listener类型是type processorListener struct。
+6. type Controller struct会把消息分发到各个listener中，listener类型是type processorListener struct。
 
 7. type processorListener struct 的add函数负责将notify装进pendingNotifications。 而pop函数取出pendingNotifications的第一个nofify, 输入nextCh这个channel。 最后run函数则负责取出notify，然后根据notify的类型(增加、删除、更新)触发相应的处理函数。
 
