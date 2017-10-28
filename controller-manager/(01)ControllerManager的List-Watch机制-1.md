@@ -496,9 +496,10 @@ podInformer会在所有的controller都初始化完成之后启动。
 在前面提到过`sharedInformers.Start(stop)`， 最后会调用定义在pkg/client/cache/shared_informer.go的`func (s *sharedIndexInformer) Run(stopCh <-chan struct{})` 来启动一个informer。
 
 其流程如下：
-1. 构建一个controller，controller的作用就是构建一个reflector，然后将watch到的资源放入fifo这个cache里面。
-2. 放入之后Process: s.HandleDeltas会对资源进行处理。
-3. 在启动controller之前，先启动了s.processor.run(stopCh)，启动在前面已经向sharedIndexInformer注册了的各个listener。
+1. NewDeltaFIFO创建了一个type DeltaFIFO struct对象
+2. 构建一个controller，controller的作用就是构建一个reflector，然后将watch到的资源放入fifo这个cache里面。
+3. 放入之后Process: s.HandleDeltas会对资源进行处理。
+4. 在启动controller之前，先启动了s.processor.run(stopCh)，启动在前面已经向sharedIndexInformer注册了的各个listener。
 
 ```go
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
@@ -558,6 +559,9 @@ s.processor.run(stopCh) 中包含了一个生产消费者模型。
 这种模式也kubernetes中非常常见的。 通过两个groutine来构造一个生产消费者模型。
 
 ### type Controller struct 消息的分发
+controller的作用就是构建一个reflector，然后将watch到的资源放入fifo这个cache里面。 
+放入之后Process: s.HandleDeltas会对资源进行处理。
+
 首先来看看`Process: s.HandleDeltas,`的定义，它会在后面通过controller来启动。
 ```go
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
@@ -624,7 +628,7 @@ func (p *processorListener) add(notification interface{}) {
 
 - type Controller struct  
 
-type Controller struct 是一个通用的controller框架。
+type Controller struct 是一个通用的controller框架。 体现了Reflector机制。
 ```go
 
 // Controller is a generic controller framework.
@@ -656,7 +660,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	r := NewReflector(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
-		c.config.Queue,
+		c.config.Queue, // Reflector机制的store，即前面的NewDeltaFIFO构建的type DeltaFIFO struct对象
 		c.config.FullResyncPeriod,
 	)
 
@@ -706,7 +710,7 @@ func (c *Controller) processLoop() {
 目前只需要知道`PopProcessFunc(c.config.Process)`就是上面的`func (s *sharedIndexInformer) HandleDeltas(obj interface{})`，
 也就是说Controller完成了event的分发。 
 
-Controller中List-Watch的数据源是一个Queue，也是用到了Reflect机制，后面再进行讲解。 
+Controller中List-Watch的数据源是一个Queue，type DeltaFIFO struct ，也是用到了Reflect机制，这部分的分析和Apiserver端的分析是差不多的。
 
 ### nextCh chanel的生产者和消费者
 在上面的`s.processor.run(stopCh)`中，见`/pkg/client/cache/shared_informer.go`。 
@@ -728,6 +732,10 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 来看看processorListener的功能函数：  
 - pop负责取出pendingNotifications的第一个nofify, 输入nextCh这个channel，是生产者。 这里就是前面的controller分发event对应上了。
 - run函数则负责取出notify，然后根据notify的类型(增加、删除、更新)触发相应的处理函数，这个函数是各个controller注册的。
+
+也就是说 type processorListener struct 的add函数负责将notify装进pendingNotifications。
+而pop函数取出pendingNotifications的第一个nofify, 输入nextCh这个channel。 
+最后run函数则负责取出notify，然后根据notify的类型(增加、删除、更新)触发相应的处理函数，这个函数是各个controller注册的。
 
 ```go
 func (p *processorListener) pop(stopCh <-chan struct{}) {
@@ -891,7 +899,190 @@ func (rm *ReplicationManager) updatePod(old, cur interface{})
 func (rm *ReplicationManager) deletePod(obj interface{}) 
 ```
 
-至此rc的数据就已经交付到PodController了。
+Add、Update、Delete三个操作最后都调用了type DeltaFIFO struct的queueActionLocked函数。
+
+```go
+// obj could be an *api.ReplicationController, or a DeletionFinalStateUnknown marker item.
+func (rm *ReplicationManager) enqueueController(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return
+	}
+
+	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
+	// deterministically avoid syncing controllers that fight over pods. Currently, we only
+	// ensure that the same controller is synced for a given pod. When we periodically relist
+	// all controllers there will still be some replica instability. One way to handle this is
+	// by querying the store for all controllers that this rc overlaps, as well as all
+	// controllers that overlap this rc, and sorting them.
+	/*
+		会把obj的key加入到replicationmanager的queue里面
+
+		这里相当于一个生产者
+		其对应的消费者位于func (rm *ReplicationManager) worker()
+			==>replicationmanager创建了五个worker去消费这里添加的key
+	*/
+	rm.queue.Add(key)
+}
+```
+这里的rm.queue 是一个type DeltaFIFO struct对象，通过上面的`fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, s.indexer)`来生成。
+
+## type DeltaFIFO struct
+```go
+type DeltaFIFO struct {
+	// lock/cond protects access to 'items' and 'queue'.
+	lock sync.RWMutex
+	cond sync.Cond
+
+	// We depend on the property that items in the set are in
+	// the queue and vice versa, and that all Deltas in this
+	// map have at least one Delta.
+	items map[string]Deltas
+	queue []string
+
+	// populated is true if the first batch of items inserted by Replace() has been populated
+	// or Delete/Add/Update was called first.
+	populated bool
+	// initialPopulationCount is the number of items inserted by the first call of Replace()
+	initialPopulationCount int
+
+	// keyFunc is used to make the key used for queued item
+	// insertion and retrieval, and should be deterministic.
+	keyFunc KeyFunc
+
+	// deltaCompressor tells us how to combine two or more
+	// deltas. It may be nil.
+	deltaCompressor DeltaCompressor
+
+	// knownObjects list keys that are "known", for the
+	// purpose of figuring out which items have been deleted
+	// when Replace() or Delete() is called.
+	knownObjects KeyListerGetter
+}
+
+// Add inserts an item, and puts it in the queue. The item is only enqueued
+// if it doesn't already exist in the set.
+func (f *DeltaFIFO) Add(obj interface{}) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.populated = true
+	/*
+		Add、Update、Delete操作最后都调用了queueActionLocked函数
+	*/
+	return f.queueActionLocked(Added, obj)
+}
+```
+
+- func (f *DeltaFIFO) queueActionLocked
+
+最后处理的结果会更新到f.items里面，相当于一个生产者！ 
+其对应的消费者在/pkg/client/cache/controller.go ==>func (c *Controller) Run(stopCh <-chan struct{})  ==>wait.Until(c.processLoop, time.Second, stopCh)
+
+这是一个典型的生产者和消费者模型，reflector往fifo里面添加数据，而processLoop就不停地去消费这里这些数据。
+
+```go
+// queueActionLocked appends to the delta list for the object, calling
+// f.deltaCompressor if needed. Caller must lock first.
+/*
+	译：queueActionLocked附加到对象的增量列表中，
+		如果需要，调用f.deltaCompressor。 Caller必须先执行锁操作。
+
+	处理的结果会更新到f.items里面
+*/
+func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
+	id, err := f.KeyOf(obj)
+	if err != nil {
+		return KeyError{obj, err}
+	}
+
+	// If object is supposed to be deleted (last event is Deleted),
+	// then we should ignore Sync events, because it would result in
+	// recreation of this object.
+	if actionType == Sync && f.willObjectBeDeletedLocked(id) {
+		return nil
+	}
+
+	newDeltas := append(f.items[id], Delta{actionType, obj})
+	newDeltas = dedupDeltas(newDeltas)
+	if f.deltaCompressor != nil {
+		newDeltas = f.deltaCompressor.Compress(newDeltas)
+	}
+
+	_, exists := f.items[id]
+	if len(newDeltas) > 0 {
+		if !exists {
+			f.queue = append(f.queue, id)
+		}
+		f.items[id] = newDeltas
+		f.cond.Broadcast()
+	} else if exists {
+		// The compression step removed all deltas, so
+		// we need to remove this from our map (extra items
+		// in the queue are ignored if they are not in the
+		// map).
+		delete(f.items, id)
+	}
+	return nil
+}
+```
+
+## 确保Pod副本数与rc规定的相同
+最后来看看worker是怎么消费rm.queue的
+```go
+// worker runs a worker thread that just dequeues items, processes them, and marks them done.
+// It enforces that the syncHandler is never invoked concurrently with the same key.
+/*
+	译：func (rm *ReplicationManager) worker() 运行一个worker线程，只需将items排队，处理它们并将其标记完毕。
+	   func (rm *ReplicationManager) worker() 强制syncHandler从不与同一个键并发调用。
+*/
+func (rm *ReplicationManager) worker() {
+	workFunc := func() bool {
+		key, quit := rm.queue.Get()
+		if quit {
+			return true
+		}
+		defer rm.queue.Done(key)
+
+		/*
+			syncHandler是个重要的函数，负责pod与rc的同步，确保Pod副本数与rc规定的相同。
+			rm.syncHandler = rm.syncReplicationController
+				=>func (rm *ReplicationManager) syncReplicationController(key string) error
+		*/
+		err := rm.syncHandler(key.(string))
+		if err == nil {
+			rm.queue.Forget(key)
+			return false
+		}
+
+		rm.queue.AddRateLimited(key)
+		utilruntime.HandleError(err)
+		return false
+	}
+	for {
+		if quit := workFunc(); quit {
+			glog.Infof("replication controller worker shutting down")
+			return
+		}
+	}
+}
+
+// syncReplicationController will sync the rc with the given key if it has had its expectations fulfilled, meaning
+// it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
+// concurrently with the same key.
+/*
+	译：syncReplicationController将同步rc与指定的key，
+		如果该rc已经满足了它的期望，这意味着它不再看到任何更多的pod创建或删除。
+		不能用同一个key来同时唤醒本函数。
+*/
+func (rm *ReplicationManager) syncReplicationController(key string) error {
+	/*
+		入参key 可以看作是一个rc
+	*/
+	...
+	...
+}
+```
 
 
 
