@@ -23,8 +23,8 @@
 etcd中存储的是带版本的，这也是Apiserver实现多版本转换的核心。
 多个external version版本之间的资源进行相互转换，都是需要通过internal version进行中转。
 
-internal version的对象定义在`/kubernetes-1.5.2/pkg/api/types.go`。  
-core v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pkg/api/v1/types.go`。  
+对于core Group而言，internal version的对象定义在`/kubernetes-1.5.2/pkg/api/types.go`。  
+v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pkg/api/v1/types.go`。  
 一个对象在internal version和external version中的定义可以一样，也可以不一样。
 
 资源的核心对象是该类型资源的主体，参与操作资源的相关方法和持久化。

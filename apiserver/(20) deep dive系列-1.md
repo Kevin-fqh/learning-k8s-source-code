@@ -13,7 +13,7 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 ## 引言
-如果你对Kubernetes的内部机制感兴趣，以及如何调试k8s，那么这篇博客文章系列是为您而设。
+如果你对Kubernetes的内部机制感兴趣，以及如何调试k8s，那么这`deep dive`系列就是为你而设。
 此外，如果希望扩展Kubernetes或开始贡献项目，你可能会从中受益。
 
 在本文中，我们从介绍Kubernetes API Server开始，然后介绍一些术语并解释API请求流程。

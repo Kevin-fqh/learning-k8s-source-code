@@ -1,4 +1,4 @@
-# Apiserver端List-Watch机制
+# Apiserver端List-Watch机制-1
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -1053,9 +1053,3 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
 至此可以说Event已经分发到了各个订阅者的watcher中了，后续各个Watcher组件会从channel input中获取到event。
 
 至于，各个Watcher是怎么创建的，后面会进行介绍。
-
-## 总结
-kube-apiserver初始化时，建立对etcd的连接，并对etcd进行watch，将watch的结果存入watchCache。
-当其他组件需要watch资源时，其他组件向apiserver发送一个watch请求，这个请求是可以带filter函数的。
-apiserver针对这个请求会创建一个watcher，并基于watcher创建WatchServer。
-watchCache watch的对象，首先会通过filter函数的过滤，假如过滤通过的话，则会通过WatcherServer发送给订阅组件。
