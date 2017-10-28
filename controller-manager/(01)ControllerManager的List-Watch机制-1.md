@@ -190,6 +190,28 @@ func (f *podInformer) Lister() *cache.StoreToPodLister {
 }
 ```
 
+看一下NewPodInformer函数，这里面定义了ListFunc和WatchFunc。 这里声明了下面Reflector机制的List-Watch的数据源头。
+```go
+// NewPodInformer returns a SharedIndexInformer that lists and watches all pods
+func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().Pods(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().Pods(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.Pod{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
+	return sharedIndexInformer
+}
+```
+
 来看看func (f *podInformer) Informer()中的`informer = NewPodInformer(f.client, f.defaultResync)`。 
 主要是新建了一个type sharedIndexInformer struct对象。
 ```go
@@ -1142,7 +1164,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 
 3. 所有Informer的协程中都会有一个type Controller struct，其作用是构建一个Reflector，然后将watch到的资源放入fifo这个cache里面。
 
-4. 这里的Reflector机制的store是一个type DeltaFIFO struct对象，Reflector保证只会把符合expectedType类型的对象存放到store中。
+4. 这里的Reflector机制的store是一个type DeltaFIFO struct对象，Reflector保证只会把符合expectedType类型的对象存放到store中。 其数据源在func NewPodInformer中进行了声明。
 
 5. 一个sharedIndexInformer中会生成多个type processorListener struct。
 
