@@ -1,12 +1,16 @@
-# Client端的List-Watch机制-ControllerManager
+# ControllerManager的List-Watch机制-1
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-  - [kubelet获取Apiserver的数据](#kubelet获取apiserver的数据)
-  - [func NewListWatchFromClient](#func-newlistwatchfromclient)
-  - [func newSourceApiserverFromLW](#func-newsourceapiserverfromlw)
-  - [type UndeltaStore struct](#type-undeltastore-struct)
-  - [Reflector部分](#reflector部分)
+  - [type sharedInformerFactory struct](#type-sharedinformerfactory-struct)
+  - [type podInformer struct](#type-podinformer-struct)
+  - [type sharedIndexInformer struct](#type-sharedindexinformer-struct)
+  - [kube-controller-manager启动各种controller](#kube-controller-manager启动各种controller)
+  - [replicationcontroller向podInformer注册](#replicationcontroller向podinformer注册)
+  - [一个informer run起来之后是如何运行的](#一个informer-run起来之后是如何运行的)
+  - [消息的分发，type Controller struct](#消息的分发，type-controller-struct)
+  - [nextCh chanel的生产者和消费者](#nextch-chanel的生产者和消费者)
+  - [replication controller 注册的管理pod的函数](#replication-controller-注册的管理pod的函数)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -392,6 +396,7 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer cache
 ```
 
 - podInformer.AddEventHandler 
+
 来看看type sharedIndexInformer struct的AddEventHandler函数，见`/pkg/client/cache/shared_informer.go`。
 
 每一种controller需要使用podinformer时，都会注册，podinformer将handler ResourceEventHandler包装成listerner，然后添加到s.processor.listeners里面。
@@ -452,7 +457,7 @@ func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) erro
 }
 ```
 
-- newProcessListener  
+- type processorListener struct  
 
 ```go
 type processorListener struct {
@@ -486,8 +491,6 @@ func newProcessListener(handler ResourceEventHandler) *processorListener {
 
 至此replicationcontroller已经向podInformer成功注册。 
 podInformer会在所有的controller都初始化完成之后启动。
-
-
 
 ## 一个informer run起来之后是如何运行的
 在前面提到过`sharedInformers.Start(stop)`， 最后会调用定义在pkg/client/cache/shared_informer.go的`func (s *sharedIndexInformer) Run(stopCh <-chan struct{})` 来启动一个informer。
@@ -549,8 +552,165 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 }
 ```
 
-先来看看`s.processor.run(stopCh)`，见`/pkg/client/cache/shared_informer.go`。 
-这里的p.listeners正是前面的`func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler)`中一个controller向shareInformer注册时添加的。
+s.controller.Run(stopCh) 会完成消息的分发，把watch到的信息分发到各个listener中。
+
+s.processor.run(stopCh) 中包含了一个生产消费者模型。 
+这种模式也kubernetes中非常常见的。 通过两个groutine来构造一个生产消费者模型。
+
+### 消息的分发，type Controller struct
+首先来看看`Process: s.HandleDeltas,`的定义，它会在后面通过controller来启动。
+```go
+func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+
+	// from oldest to newest
+	for _, d := range obj.(Deltas) {
+		/*
+			在func (p *sharedProcessor) distribute(obj interface{})中，
+			被watch的资源被传到了各个listener
+			各个listener是如何处理的？见
+				==>/pkg/client/cache/shared_informer.go
+					==>func (s *sharedIndexInformer) Run(stopCh <-chan struct{})
+						==>s.processor.run(stopCh)
+		*/
+		switch d.Type {
+		case Sync, Added, Updated:
+			s.cacheMutationDetector.AddObject(d.Object)
+			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
+				if err := s.indexer.Update(d.Object); err != nil {
+					return err
+				}
+				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object})
+			} else {
+				if err := s.indexer.Add(d.Object); err != nil {
+					return err
+				}
+				s.processor.distribute(addNotification{newObj: d.Object})
+			}
+		case Deleted:
+			if err := s.indexer.Delete(d.Object); err != nil {
+				return err
+			}
+			s.processor.distribute(deleteNotification{oldObj: d.Object})
+		}
+	}
+	return nil
+}
+```
+
+主要是调用distribute函数来完成信息的分发，把消息发送给所有的listener。
+```go
+func (p *sharedProcessor) distribute(obj interface{}) {
+	for _, listener := range p.listeners {
+		/*
+			调用listernner的add函数，负责将notify装进pendingNotifications，
+		*/
+		listener.add(obj)
+	}
+}
+
+func (p *processorListener) add(notification interface{}) {
+	/*
+		listenser的add函数负责将notify装进pendingNotifications，
+	*/
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.pendingNotifications = append(p.pendingNotifications, notification)
+	p.cond.Broadcast()
+}
+```
+
+- type Controller struct  
+
+type Controller struct 是一个通用的controller框架。
+```go
+
+// Controller is a generic controller framework.
+
+type Controller struct {
+	config         Config
+	reflector      *Reflector
+	reflectorMutex sync.RWMutex
+}
+
+// New makes a new Controller from the given Config.
+func New(c *Config) *Controller {
+	ctlr := &Controller{
+		config: *c,
+	}
+	return ctlr
+}
+
+// Run begins processing items, and will continue until a value is sent down stopCh.
+// It's an error to call Run more than once.
+// Run blocks; call via go.
+
+func (c *Controller) Run(stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
+	/*
+		首先构建了一个reflector,这里体现了Wtach-List
+		从这里看出informer只是包装了reflector
+	*/
+	r := NewReflector(
+		c.config.ListerWatcher,
+		c.config.ObjectType,
+		c.config.Queue,
+		c.config.FullResyncPeriod,
+	)
+
+	c.reflectorMutex.Lock()
+	c.reflector = r
+	c.reflectorMutex.Unlock()
+
+	/*
+		启动reflector
+	*/
+	r.RunUntil(stopCh)
+
+	/*
+		启动func (c *Controller) processLoop()
+		消费event
+		其对应的生产者在Queue中，需要去查看对应cache的Add、Update、Delete函数
+		这里的cache是type DeltaFIFO struct
+			eg：==>/pkg/client/cache/delta_fifo.go中的
+					==>func (f *DeltaFIFO) Add(obj interface{}) error
+					==>func (f *DeltaFIFO) Delete(obj interface{})
+					==>func (f *DeltaFIFO) Update(obj interface{}) error
+	*/
+	wait.Until(c.processLoop, time.Second, stopCh) ///每秒调用一次
+}
+
+// processLoop drains the work queue.
+// TODO: Consider doing the processing in parallel. This will require a little thought
+// to make sure that we don't end up processing the same object multiple times
+// concurrently.
+
+func (c *Controller) processLoop() {
+	for {
+		/*
+			调用func (f *DeltaFIFO) Pop(process PopProcessFunc)
+			==>定义在/pkg/client/cache/delta_fifo.go
+		*/
+		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
+		if err != nil {
+			if c.config.RetryOnError {
+				// This is the safe way to re-enqueue.
+				c.config.Queue.AddIfNotPresent(obj)
+			}
+		}
+	}
+}
+```
+目前只需要知道`PopProcessFunc(c.config.Process)`就是上面的`func (s *sharedIndexInformer) HandleDeltas(obj interface{})`，
+也就是说Controller完成了event的分发。 
+
+Controller中List-Watch的数据源是一个Queue，也是用到了Reflect机制，后面再进行讲解。 
+
+### nextCh chanel的生产者和消费者
+在上面的`s.processor.run(stopCh)`中，见`/pkg/client/cache/shared_informer.go`。 
+这里的p.listeners正是前面的`func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler)`中一个controller向shareInformer注册时添加的一个个listener。
 ```go
 func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 	for _, listener := range p.listeners {
@@ -561,6 +721,179 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 		go listener.pop(stopCh)
 	}
 }
-
-
 ```
+
+- type processorListener struct  
+
+来看看processorListener的功能函数：  
+- pop负责取出pendingNotifications的第一个nofify, 输入nextCh这个channel，是生产者。 这里就是前面的controller分发event对应上了。
+- run函数则负责取出notify，然后根据notify的类型(增加、删除、更新)触发相应的处理函数，这个函数是各个controller注册的。
+
+```go
+func (p *processorListener) pop(stopCh <-chan struct{}) {
+	/*
+		pop函数取出pendingNotifications的第一个nofify,输入nextCh这个channel
+	*/
+	defer utilruntime.HandleCrash()
+
+	for {
+		blockingGet := func() (interface{}, bool) {
+			p.lock.Lock()
+			defer p.lock.Unlock()
+
+			for len(p.pendingNotifications) == 0 {
+				// check if we're shutdown
+				select {
+				case <-stopCh:
+					return nil, true
+				default:
+				}
+				p.cond.Wait()
+			}
+
+			nt := p.pendingNotifications[0]
+			p.pendingNotifications = p.pendingNotifications[1:]
+			return nt, false
+		}
+
+		notification, stopped := blockingGet()
+		if stopped {
+			return
+		}
+
+		select {
+		case <-stopCh:
+			return
+		case p.nextCh <- notification:
+		}
+	}
+}
+
+func (p *processorListener) run(stopCh <-chan struct{}) {
+	/*
+		run函数则负责取出notify，
+		然后根据notify的类型(增加、删除、更新)触发相应的处理函数，
+		这个函数是各个controller注册的。
+	*/
+	defer utilruntime.HandleCrash()
+
+	for {
+		var next interface{}
+		select {
+		case <-stopCh:
+			func() {
+				p.lock.Lock()
+				defer p.lock.Unlock()
+				p.cond.Broadcast()
+			}()
+			return
+		case next = <-p.nextCh:
+		}
+
+		switch notification := next.(type) {
+		case updateNotification:
+			p.handler.OnUpdate(notification.oldObj, notification.newObj)
+		case addNotification:
+			/*
+				 replication controller 注册的add函数定义在
+					==>/pkg/controller/replication/replication_controller.go
+						==>podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs
+							==>AddFunc: rm.addPod,
+			*/
+			p.handler.OnAdd(notification.newObj)
+		case deleteNotification:
+			p.handler.OnDelete(notification.oldObj)
+		default:
+			utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
+		}
+	}
+}
+```
+
+## replication controller 注册的管理pod的函数
+最后再来看看replication controller 注册的管理pod的函数。
+
+- 如何注册的？
+
+首先它是通过定义在`/pkg/client/cache/shared_informer.go` 的 `func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler)`来完成注册的。
+
+AddFunc、UpdateFunc和DeleteFunc都由handler来掌握，handler的类型是一个`type ResourceEventHandler interface `
+```go
+type ResourceEventHandler interface {
+	OnAdd(obj interface{})
+	OnUpdate(oldObj, newObj interface{})
+	OnDelete(obj interface{})
+}
+
+// ResourceEventHandlerFuncs is an adaptor to let you easily specify as many or
+// as few of the notification functions as you want while still implementing
+// ResourceEventHandler.
+/*
+	ResourceEventHandlerFuncs是一个适配器，可让您轻松地指定尽可能少的通知函数，
+	同时仍然在实现type ResourceEventHandler interface。
+*/
+type ResourceEventHandlerFuncs struct {
+	AddFunc    func(obj interface{})
+	UpdateFunc func(oldObj, newObj interface{})
+	DeleteFunc func(obj interface{})
+}
+```
+
+- 三个函数
+
+定义在/pkg/controller/replication/replication_controller.go 中。
+
+```go
+// When a pod is created, enqueue the controller that manages it and update it's expectations.
+/*
+	译：创建pod后，将管理它的controller（指PodController）排入队列，并更新该rc的期望值。
+*/
+func (rm *ReplicationManager) addPod(obj interface{}) {
+	pod := obj.(*api.Pod)
+
+	/*
+		首先会根据pod得到rc，
+		当pod不属于任何一个rc时，则return。
+		找到rc以后，更新rm.expectations.CreationObserved(rcKey)这个rc的期望值，
+		也就是假如一个rc有4个pod，现在检测到创建了一个pod，则会将这个rc的期望值减少，变为3。
+		最后将这个rc放入队列。
+	*/
+	rc := rm.getPodController(pod)
+	if rc == nil {
+		return
+	}
+	rcKey, err := controller.KeyFunc(rc)
+	if err != nil {
+		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
+		return
+	}
+
+	if pod.DeletionTimestamp != nil {
+		// on a restart of the controller manager, it's possible a new pod shows up in a state that
+		// is already pending deletion. Prevent the pod from being a creation observation.
+		/*
+			译：在重新启动controller manager时，可能会出现一个新的pod处于等待删除的状态。
+		*/
+		rm.deletePod(pod)
+		return
+	}
+	rm.expectations.CreationObserved(rcKey)
+	rm.enqueueController(rc)
+}
+
+// When a pod is updated, figure out what controller/s manage it and wake them
+// up. If the labels of the pod have changed we need to awaken both the old
+// and new controller. old and cur must be *api.Pod types.
+func (rm *ReplicationManager) updatePod(old, cur interface{})
+
+// When a pod is deleted, enqueue the controller that manages the pod and update its expectations.
+// obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
+func (rm *ReplicationManager) deletePod(obj interface{}) 
+```
+
+至此rc的数据就已经交付到PodController了。
+
+
+
+
+
