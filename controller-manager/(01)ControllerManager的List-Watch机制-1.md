@@ -8,9 +8,12 @@
   - [kube-controller-manager启动各种controller](#kube-controller-manager启动各种controller)
   - [replicationcontroller向podInformer注册](#replicationcontroller向podinformer注册)
   - [一个informer run起来之后是如何运行的](#一个informer-run起来之后是如何运行的)
-  - [type Controller struct 消息的分发](#type-controller-struct-消息的分发)
-  - [nextCh chanel的生产者和消费者](#nextch-chanel的生产者和消费者)
+    - [type Controller struct](#type-controller-struct)
+    - [nextCh chanel的生产者和消费者](#nextch-chanel的生产者和消费者)
   - [replication controller 注册的管理pod的函数](#replication-controller-注册的管理pod的函数)
+  - [type DeltaFIFO struct](#type-deltafifo-struct)
+  - [确保Pod副本数与rc规定的相同](#确保Pod副本数与rc规定的相同)
+  - [路线图](#路线图)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -141,7 +144,7 @@ func (f *sharedInformerFactory) Nodes() NodeInformer {
 ```
 
 ## type podInformer struct
-type podInformer struct 实现了type PodInformer interface， 见`/pkg/controller/informers/core.go`。
+type podInformer struct 实现了type PodInformer interface， 见`/pkg/controller/informers/core.go`。 是其中的一种sharedIndexInformer。
 
 ```go
 // PodInformer is type of SharedIndexInformer which watches and lists all pods.
@@ -558,9 +561,9 @@ s.controller.Run(stopCh) 会完成消息的分发，把watch到的信息分发�
 s.processor.run(stopCh) 中包含了一个生产消费者模型。 
 这种模式也kubernetes中非常常见的。 通过两个groutine来构造一个生产消费者模型。
 
-### type Controller struct 消息的分发
+### type Controller struct 
 controller的作用就是构建一个reflector，然后将watch到的资源放入fifo这个cache里面。 
-放入之后Process: s.HandleDeltas会对资源进行处理。
+放入之后Process: s.HandleDeltas会对资源进行处理，完成消息的分发。
 
 首先来看看`Process: s.HandleDeltas,`的定义，它会在后面通过controller来启动。
 ```go
@@ -676,8 +679,11 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	/*
 		启动func (c *Controller) processLoop()
 		消费event
-		其对应的生产者在Queue中，需要去查看对应cache的Add、Update、Delete函数
-		这里的cache是type DeltaFIFO struct
+		其对应的生产者是上面的Reflector机制，
+		reflector往fifo里面添加数据，而processLoop就不停地去消费这里这些数据。
+
+		查看对应cache的Add、Update、Delete函数
+		这里的cache是c.config.Queue，其类型是type DeltaFIFO struct ，
 			eg：==>/pkg/client/cache/delta_fifo.go中的
 					==>func (f *DeltaFIFO) Add(obj interface{}) error
 					==>func (f *DeltaFIFO) Delete(obj interface{})
@@ -710,7 +716,7 @@ func (c *Controller) processLoop() {
 目前只需要知道`PopProcessFunc(c.config.Process)`就是上面的`func (s *sharedIndexInformer) HandleDeltas(obj interface{})`，
 也就是说Controller完成了event的分发。 
 
-Controller中List-Watch的数据源是一个Queue，type DeltaFIFO struct ，也是用到了Reflect机制，这部分的分析和Apiserver端的分析是差不多的。
+Controller中List-Watch的数据源是一个Queue，type DeltaFIFO struct ，用到了Reflect机制，这部分的分析和Apiserver端的分析是差不多的。
 
 ### nextCh chanel的生产者和消费者
 在上面的`s.processor.run(stopCh)`中，见`/pkg/client/cache/shared_informer.go`。 
@@ -901,6 +907,8 @@ func (rm *ReplicationManager) deletePod(obj interface{})
 
 Add、Update、Delete三个操作最后都调用了type DeltaFIFO struct的queueActionLocked函数。
 
+enqueueController把消息obj发送给各个worker中。
+
 ```go
 // obj could be an *api.ReplicationController, or a DeletionFinalStateUnknown marker item.
 func (rm *ReplicationManager) enqueueController(obj interface{}) {
@@ -922,6 +930,9 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 		这里相当于一个生产者
 		其对应的消费者位于func (rm *ReplicationManager) worker()
 			==>replicationmanager创建了五个worker去消费这里添加的key
+
+		rm.queue.Add函数定义在
+			==>package /pkg/util/workqueue
 	*/
 	rm.queue.Add(key)
 }
@@ -929,6 +940,8 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 这里的rm.queue 是一个type DeltaFIFO struct对象，通过上面的`fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, s.indexer)`来生成。
 
 ## type DeltaFIFO struct
+Reflector机制的store是一个type DeltaFIFO struct对象，Reflector保证只会把符合expectedType类型的对象存放到store中。
+
 ```go
 type DeltaFIFO struct {
 	// lock/cond protects access to 'items' and 'queue'.
@@ -977,9 +990,7 @@ func (f *DeltaFIFO) Add(obj interface{}) error {
 - func (f *DeltaFIFO) queueActionLocked
 
 最后处理的结果会更新到f.items里面，相当于一个生产者！ 
-其对应的消费者在/pkg/client/cache/controller.go ==>func (c *Controller) Run(stopCh <-chan struct{})  ==>wait.Until(c.processLoop, time.Second, stopCh)
-
-这是一个典型的生产者和消费者模型，reflector往fifo里面添加数据，而processLoop就不停地去消费这里这些数据。
+其对应的消费者在`func (f *DeltaFIFO) Pop(process PopProcessFunc)`
 
 ```go
 // queueActionLocked appends to the delta list for the object, calling
@@ -1025,10 +1036,48 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 	}
 	return nil
 }
+
+func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	for {
+		for len(f.queue) == 0 {
+			f.cond.Wait()
+		}
+		id := f.queue[0]
+		f.queue = f.queue[1:]
+		/*
+			从f.items取出object，然后调用process函数进行处理。
+		*/
+		item, ok := f.items[id]
+		if f.initialPopulationCount > 0 {
+			f.initialPopulationCount--
+		}
+		if !ok {
+			// Item may have been deleted subsequently.
+			continue
+		}
+		delete(f.items, id)
+		/*
+			在创建informer时，就已经指定了Process函数
+				==>/pkg/client/cache/controller.go
+					==>func NewIndexerInformer
+						==>cfg的Process
+		*/
+		err := process(item)
+		if e, ok := err.(ErrRequeue); ok {
+			f.addIfNotPresent(id, item)
+			err = e.Err
+		}
+		// Don't need to copyDeltas here, because we're transferring
+		// ownership to the caller.
+		return item, err
+	}
+}
 ```
 
 ## 确保Pod副本数与rc规定的相同
-最后来看看worker是怎么消费rm.queue的
+最后来看看ReplicationManager的worker怎么工作的？
 ```go
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
@@ -1083,6 +1132,31 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	...
 }
 ```
+
+## 路线图
+可以看到kube-controller-manager的list-watch是要比kubelet组件复杂得多的。 但其本质上都是对Reflect机制的使用。
+
+1. controller都会向共享型Informer进行注册，如replicationcontroller向podInformer注册。
+
+2. 首先type sharedInformerFactory struct中会记录着所有的共享型Informer，每一个Informer都会通过一个协程run起来。
+
+3. 所有Informer的协程中都会有一个type Controller struct，其作用是构建一个Reflector，然后将watch到的资源放入fifo这个cache里面。
+
+4. 这里的Reflector机制的store是一个type DeltaFIFO struct对象，Reflector保证只会把符合expectedType类型的对象存放到store中。
+
+5. 一个sharedIndexInformer中会生成多个type processorListener struct。
+
+6. Controller会把消息分发到各个listener中，listener类型是type processorListener struct。
+
+7. type processorListener struct 的add函数负责将notify装进pendingNotifications。 而pop函数取出pendingNotifications的第一个nofify, 输入nextCh这个channel。 最后run函数则负责取出notify，然后根据notify的类型(增加、删除、更新)触发相应的处理函数。
+
+8. ReplicationManager的worker会负责处理各种event，确保Pod副本数与rc规定的相同。
+
+9. 对于每个pod 的change都会唤起replication controller在podInformer.AddEventHandler中注册的方法。
+
+
+
+
 
 
 
