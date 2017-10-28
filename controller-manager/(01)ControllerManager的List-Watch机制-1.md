@@ -8,7 +8,7 @@
   - [kube-controller-manager启动各种controller](#kube-controller-manager启动各种controller)
   - [replicationcontroller向podInformer注册](#replicationcontroller向podinformer注册)
   - [一个informer run起来之后是如何运行的](#一个informer-run起来之后是如何运行的)
-  - [消息的分发，type Controller struct](#消息的分发，type-controller-struct)
+  - [type Controller struct 消息的分发](#type-controller-struct-消息的分发)
   - [nextCh chanel的生产者和消费者](#nextch-chanel的生产者和消费者)
   - [replication controller 注册的管理pod的函数](#replication-controller-注册的管理pod的函数)
 
@@ -557,7 +557,7 @@ s.controller.Run(stopCh) 会完成消息的分发，把watch到的信息分发�
 s.processor.run(stopCh) 中包含了一个生产消费者模型。 
 这种模式也kubernetes中非常常见的。 通过两个groutine来构造一个生产消费者模型。
 
-### 消息的分发，type Controller struct
+### type Controller struct 消息的分发
 首先来看看`Process: s.HandleDeltas,`的定义，它会在后面通过controller来启动。
 ```go
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
