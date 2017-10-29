@@ -927,8 +927,6 @@ func (rm *ReplicationManager) updatePod(old, cur interface{})
 func (rm *ReplicationManager) deletePod(obj interface{}) 
 ```
 
-Add、Update、Delete三个操作最后都调用了type DeltaFIFO struct的queueActionLocked函数。
-
 enqueueController把消息obj发送给各个worker中。
 
 ```go
@@ -959,7 +957,7 @@ func (rm *ReplicationManager) enqueueController(obj interface{}) {
 	rm.queue.Add(key)
 }
 ```
-这里的rm.queue 是一个type DeltaFIFO struct对象，通过上面的`fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, s.indexer)`来生成。
+这里的rm.queue 是类型是workqueue.RateLimitingInterface。更新完一个rc资源之后，把其放入queue中，等待ReplicationManager的worker的处理，确保Pod副本数与rc规定的相同。
 
 ## type DeltaFIFO struct
 Reflector机制的store是一个type DeltaFIFO struct对象，Reflector保证只会把符合expectedType类型的对象存放到store中。
@@ -1098,62 +1096,6 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 }
 ```
 
-## 确保Pod副本数与rc规定的相同
-最后来看看ReplicationManager的worker怎么工作的？
-```go
-// worker runs a worker thread that just dequeues items, processes them, and marks them done.
-// It enforces that the syncHandler is never invoked concurrently with the same key.
-/*
-	译：func (rm *ReplicationManager) worker() 运行一个worker线程，只需将items排队，处理它们并将其标记完毕。
-	   func (rm *ReplicationManager) worker() 强制syncHandler从不与同一个键并发调用。
-*/
-func (rm *ReplicationManager) worker() {
-	workFunc := func() bool {
-		key, quit := rm.queue.Get()
-		if quit {
-			return true
-		}
-		defer rm.queue.Done(key)
-
-		/*
-			syncHandler是个重要的函数，负责pod与rc的同步，确保Pod副本数与rc规定的相同。
-			rm.syncHandler = rm.syncReplicationController
-				=>func (rm *ReplicationManager) syncReplicationController(key string) error
-		*/
-		err := rm.syncHandler(key.(string))
-		if err == nil {
-			rm.queue.Forget(key)
-			return false
-		}
-
-		rm.queue.AddRateLimited(key)
-		utilruntime.HandleError(err)
-		return false
-	}
-	for {
-		if quit := workFunc(); quit {
-			glog.Infof("replication controller worker shutting down")
-			return
-		}
-	}
-}
-
-// syncReplicationController will sync the rc with the given key if it has had its expectations fulfilled, meaning
-// it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
-// concurrently with the same key.
-/*
-	译：syncReplicationController将同步rc与指定的key，
-		如果该rc已经满足了它的期望，这意味着它不再看到任何更多的pod创建或删除。
-		不能用同一个key来同时唤醒本函数。
-*/
-func (rm *ReplicationManager) syncReplicationController(key string) error {
-	/*
-		入参key 可以看作是一个rc
-	*/
-	...
-	...
-}
-```
 
 ## 路线图
 可以看到kube-controller-manager的list-watch是要比kubelet组件复杂得多的。 但其本质上都是对Reflect机制的使用。
@@ -1175,6 +1117,10 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 8. ReplicationManager的worker会负责处理各种event，确保Pod副本数与rc规定的相同。
 
 9. 对于每个pod 的change都会唤起replication controller在podInformer.AddEventHandler中注册的方法。
+
+10. 观察到pod资源的变化，会去更新其对应的rc资源。 通过影响rc来变更pod的状态。
+
+11. 更新完一个rc资源之后，把其放入queue workqueue.RateLimitingInterface中，等待ReplicationManager的worker的处理，确保Pod副本数与rc规定的相同。
 
 
 
