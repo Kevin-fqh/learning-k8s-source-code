@@ -12,7 +12,6 @@
     - [nextCh chanel的生产者和消费者](#nextch-chanel的生产者和消费者)
   - [replication controller 注册的管理pod的函数](#replication-controller-注册的管理pod的函数)
   - [type DeltaFIFO struct](#type-deltafifo-struct)
-  - [确保Pod副本数与rc规定的相同](#确保Pod副本数与rc规定的相同)
   - [路线图](#路线图)
 
 <!-- END MUNGE: GENERATED_TOC -->
