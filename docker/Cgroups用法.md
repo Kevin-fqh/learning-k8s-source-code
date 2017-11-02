@@ -5,8 +5,18 @@
   - [创建并挂载一个hierarchy](#创建并挂载一个hierarchy)
   - [在新建的hierarchy上的cgroup的根节点中扩展出两个子cgroup](#在新建的hierarchy上的cgroup的根节点中扩展出两个子cgroup)
   - [通过subsystem来限制cgroup中进程的资源](#通过subsystem来限制cgroup中进程的资源)
+  - [Docker中的Cgroups](#docker中的cgroups)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+环境说明：
+```shell
+[root@fqhnode01 ~]# uname -a
+Linux fqhnode01 3.10.0-514.6.1.el7.x86_64 #1 SMP Wed Jan 18 13:06:36 UTC 2017 x86_64 x86_64 x86_64 GNU/Linux
+[root@fqhnode01 ~]# docker version
+Client:
+ Version:      1.13.1
+```
 
 ## 创建并挂载一个hierarchy
 ```shell
@@ -179,5 +189,24 @@ yum install stress.x86_64
 
 最后说一下上面创建的`/sys/fs/cgroup/memory/test-limit-memory`文件会在重启之后被系统自动删除。
 如果要删除一个cgroup，用umount命令。
+
+## Docker中的Cgroups
+```shell
+[root@fqhnode01 memory]# docker run -itd  -e is_leader=true -e node_name=aaa -m 128m 98c2ef0aa9bb
+e19acd747074941e9062f2beb5163927b097296f31b7a0317ecb93387cc16466
+```
+docker 会自动在memory hierarchy的目录下新建一个cgroup节点
+```shell
+[root@fqhnode01 e19acd747074941e9062f2beb5163927b097296f31b7a0317ecb93387cc16466]# pwd
+/sys/fs/cgroup/memory/docker/e19acd747074941e9062f2beb5163927b097296f31b7a0317ecb93387cc16466
+[root@fqhnode01 e19acd747074941e9062f2beb5163927b097296f31b7a0317ecb93387cc16466]# cat memory.limit_in_bytes 
+134217728
+[root@fqhnode01 e19acd747074941e9062f2beb5163927b097296f31b7a0317ecb93387cc16466]# cat memory.usage_in_bytes 
+66355200
+```
+
+- memory.limit_in_bytes 内存限制
+- memory.usage_in_bytes 该cgroup中的进程已经使用的memory
+
 
 
