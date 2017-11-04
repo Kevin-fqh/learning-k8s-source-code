@@ -2,6 +2,7 @@
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
+  -[type ReplicationManager struct](#type-replicationmanager-struct)
   - [创建一个replication manager](#创建一个replication-manager)
   - [NewIndexerInformer](#newindexerinformer)
   - [type DeltaFIFO struct](#type-deltafifo-struct)
@@ -9,6 +10,84 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 本文主要讲解 **非共享型informer** ，主要是replication controller 是如何对rc资源进行List-Watch的。
+
+## type ReplicationManager struct
+```go
+type ReplicationManager struct {
+	/*
+		访问apiserver的客户端
+	*/
+	kubeClient clientset.Interface
+	/*
+		pod操作函数的封装，在/pkg/controller/controller_utils.go里面定义实现
+			==>type PodControlInterface interface
+		提供Create/Delete Pod的操作接口。
+	*/
+	podControl controller.PodControlInterface
+
+	// internalPodInformer is used to hold a personal informer.  If we're using
+	// a normal shared informer, then the informer will be started for us.  If
+	// we have a personal informer, we must start it ourselves.   If you start
+	// the controller using NewReplicationManager(passing SharedInformer), this
+	// will be null
+	/*
+		译：
+			internalPodInformer 用于持有一个非共享的informer。
+			如果我们使用一个普通的共享型informer，该informer是已经自动运行。
+			如果我们使用一个非共享的informer，必须自己主动去start it。
+			如果你使用NewReplicationManager(passing SharedInformer)去启动一个controller，internalPodInformer应该是一个nil值
+	*/
+	internalPodInformer cache.SharedIndexInformer
+
+	// An rc is temporarily suspended after creating/deleting these many replicas.
+	// It resumes normal action after observing the watch events for them.
+	burstReplicas int //每次批量Create/Delete Pods时允许并发的最大数量。
+	// To allow injection of syncReplicationController for testing.
+	syncHandler func(rcKey string) error //真正执行Replica Sync的函数。
+
+	// A TTLCache of pod creates/deletes each rc expects to see.
+	/*
+		维护每一个rc期望状态下的Pod的Uid Cache，并且提供了修正该Cache的接口。
+
+		定义在/pkg/controller/controller_utils.go
+			==>type UIDTrackingControllerExpectations struct
+	*/
+	expectations *controller.UIDTrackingControllerExpectations
+
+	// A store of replication controllers, populated by the rcController
+	rcStore cache.StoreToReplicationControllerLister //由rcController来填充和维护,resource rc的Indexer
+	// Watches changes to all replication controllers
+	/*
+		rcController，监控所有rc resource的变化，实现rc同步的任务调度逻辑, watch到的change更新到rcStore中。
+		==>定义在/pkg/client/cache/controller.go
+			==>type Controller struct
+	*/
+	rcController *cache.Controller
+	// A store of pods, populated by the podController
+	podStore cache.StoreToPodLister //由podController来填充和维护,Pod的Indexer
+	// Watches changes to all pods
+	podController cache.ControllerInterface //监控所有pod绑定变化，实现pod同步的任务调度逻辑
+	// podStoreSynced returns true if the pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	/*
+		译：如果pod存储已至少同步一次，则podStoreSynced返回true。
+		  作为成员添加到结构体以允许注入进行测试。
+	*/
+	podStoreSynced func() bool
+
+	lookupCache *controller.MatchingCache //提供Pod和RC匹配信息的cache，以提高查询效率
+
+	// Controllers that need to be synced
+	/*
+		用来存放待sync的rc resource，是一个RateLimit类型的queue。
+	*/
+	queue workqueue.RateLimitingInterface
+
+	// garbageCollectorEnabled denotes if the garbage collector is enabled. RC
+	// manager behaves differently if GC is enabled.
+	garbageCollectorEnabled bool
+}
+```
 
 ## 创建一个replication manager
 见/pkg/controller/replication/replication_controller.go，分析其流程如下：
@@ -43,7 +122,11 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer cache
 	}
 
 	/*
-	   实体化了一个type ReplicationManager struct对象
+		   实体化了一个type ReplicationManager struct对象
+				1. 通过controller.NewUIDTrackingControllerExpectations配置expectations。
+				2. 通过workqueue.NewNamedRateLimitingQueue配置queue。
+				3. 配置rcStore, podStore, rcController, podController。
+				4. 配置syncHandler为rm.syncReplicationController，syncReplicationController就是做核心工作的的方法，可以说Replica的自动维护都是由它来完成的。
 	*/
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
@@ -58,7 +141,7 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer cache
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicationmanager"),
+		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicationmanager"), //这个是rc资源，不是rc控制器
 		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
@@ -142,6 +225,10 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer cache
 	rm.podStore.Indexer = podInformer.GetIndexer()
 	rm.podController = podInformer.GetController()
 
+	/*
+		rm.syncHandler = rm.syncReplicationController是ReplicationManager控制器的核心，
+		完成Replica的自动维护
+	*/
 	rm.syncHandler = rm.syncReplicationController
 	rm.podStoreSynced = rm.podController.HasSynced
 	rm.lookupCache = controller.NewMatchingCache(lookupCacheSize)
@@ -685,3 +772,4 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 1. 这边要处理的信息obj是一个个rc资源，而那边要处理的信息obj则是一个个pod资源。
 2. 两边都是用了type DeltaFIFO struct作为List-Watch的cache，存储watch得到的信息。
 3. 注意两边在对obj进行Add、Update、Delete时，触发函数根本不是同一个函数，别搞乱了。
+4. 关于如何维护保持一个rc名下的pod数量始终与期望状态一致，会在后面[控制器ReplicationManager分析]()一文中详细分析。
