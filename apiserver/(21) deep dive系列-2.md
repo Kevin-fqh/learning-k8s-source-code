@@ -334,10 +334,10 @@ v1beta1 ⇒ internal ⇒    |    ⇒       |    ⇒  v1  ⇒ json/yaml ⇒ etcd
 Validation 和 Admission 是进行对象的创建和更新。 这是他们的角色：
 1. **Admission**，通过验证集群的全局约束，可以检查是否可以创建或更新对象，并根据集群配置设置默认值。
   - NamespaceLifecycle，如果context中的namespace不存在，拒绝request
-  - LimitRanger，在一个namespace中对所有资源使用limit限制。
+  - LimitRanger，在一个namespace中对所有资源使用limit限制，目前仅支持cpu和memory。（设置该namespace内所有的pod、container单个的资源使用上限）
   - ServiceAccount，creates a service account for a pod.
   - DefaultStorageClass，设置PersistentVolumeClaim默认的storage class，防止用户不提供值。
-  - ResourceQuota - 为集群上的当前用户强制执行配额约束，如果配额不足，可能会拒绝请求。
+  - ResourceQuota - 为集群上的当前用户强制执行配额约束，如果配额不足，可能会拒绝请求。目前支持cpu、memory、pods等。（设置整个namespace的总配额）
 2. **Validation**，检查一个incoming object (during creation and updates)是否有效。比如：
   - 检查所有必填字段是否设置。
   - 检查所有字符串是否具有有效的格式（例如，只包括小写字符）。
