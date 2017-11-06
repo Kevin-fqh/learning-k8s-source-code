@@ -502,6 +502,10 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Linker: apiGroupInfo.GroupMeta.SelfLinker,
 		Mapper: apiGroupInfo.GroupMeta.RESTMapper,
 
+		/*
+			把前面初始化好的admissionControl赋值给APIGroupVersion
+			后面注册restfulApi的时候会用到
+		*/
 		Admit:             s.admissionControl,
 		Context:           s.RequestContextMapper(),
 		MinRequestTimeout: s.minRequestTimeout,
