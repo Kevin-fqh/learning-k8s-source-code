@@ -15,6 +15,8 @@
   - [总结](#总结)
 <!-- END MUNGE: GENERATED_TOC -->
 
+resourceQuotaController的主要任务就是维护resourceQuota对象的更新，同时也要能够根据pod、svc这些对象的变化来更新对应的resourceQuota对象。
+
 ## 引子
 和其它controller的启动一样，先看看kube-controller-manager是如何新建一个resourceQuotaController并启动的。 见 /kubernetes-1.5.2/cmd/kube-controller-manager/app/controllermanager.go
 
