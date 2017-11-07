@@ -147,6 +147,66 @@ type GenericEvaluator struct {
 }
 ```
 
+### func OperationResources()
+ 对于指定kind而言，func OperationResources(op)将返回可以被动作op修改的resources。 
+ 如果为空，admission control将忽略该op操作的配额处理。
+```go
+// OperationResources returns the set of resources that could be updated for the
+// specified operation for this kind.  If empty, admission control will ignore
+// quota processing for the operation.
+
+func (g *GenericEvaluator) OperationResources(operation admission.Operation) []api.ResourceName {
+	/*
+		InternalOperationResources在创建具体的Evaluator的时候注册
+			=>/pkg/quota/evaluator/core/pods.go
+				=>func NewPodEvaluator
+	*/
+	return g.InternalOperationResources[operation]
+}
+
+//看看注册函数
+func NewPodEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
+	computeResources := []api.ResourceName{
+		api.ResourceCPU,
+		api.ResourceMemory,
+		api.ResourceRequestsCPU,
+		api.ResourceRequestsMemory,
+		api.ResourceLimitsCPU,
+		api.ResourceLimitsMemory,
+	}
+	allResources := append(computeResources, api.ResourcePods)
+	listFuncByNamespace := listPodsByNamespaceFuncUsingClient(kubeClient)
+	if f != nil {
+		/*
+			默认通道
+			定义在 pkg/quota/generic/evaluator.go
+				==>func ListResourceUsingInformerFunc
+		*/
+		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, unversioned.GroupResource{Resource: "pods"})
+	}
+	return &generic.GenericEvaluator{
+		Name:              "Evaluator.Pod",
+		InternalGroupKind: api.Kind("Pod"),
+		/*
+			这里表示对于Kind pod而言，仅仅需要检查Create动作即可
+		*/
+		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+			admission.Create: allResources,
+			// TODO: the quota system can only charge for deltas on compute resources when pods support updates.
+			// admission.Update: computeResources,
+		},
+		GetFuncByNamespace: func(namespace, name string) (runtime.Object, error) {
+			return kubeClient.Core().Pods(namespace).Get(name)
+		},
+		ConstraintsFunc:      PodConstraintsFunc,
+		MatchedResourceNames: allResources,
+		MatchesScopeFunc:     PodMatchesScopeFunc,
+		UsageFunc:            PodUsageFunc,
+		ListFuncByNamespace:  listFuncByNamespace,
+	}
+}
+```
+
 ## type ResourceQuotaController struct
 ```go
 // ResourceQuotaController is responsible for tracking quota usage status in the system

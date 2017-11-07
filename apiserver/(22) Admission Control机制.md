@@ -6,6 +6,7 @@
   - [调用过程](#调用过程)
   - [chainAdmissionHandler](#chainadmissionhandler)
   - [所有plugin的通用函数](#所有plugin的通用函数)
+  - [type attributesRecord struct](type-attributesrecord-struct)
   - [type Handler struct](#type-handler-struct)
   - [支持的设置请求类型](#支持的设置请求类型)
   - [总结](#总结)
@@ -244,6 +245,22 @@ func RegisterPlugin(name string, plugin Factory) {
 }
 ```
 
+## type attributesRecord struct
+每次request请求都会新生成一个admission.Attributes对象，而admission control 模块就是负责对一个a admission.Attributes进行检查，以判断该request是否满足约束。 见/pkg/admission/attributes.go
+```go
+type attributesRecord struct {
+	kind        unversioned.GroupVersionKind
+	namespace   string
+	name        string
+	resource    unversioned.GroupVersionResource
+	subresource string
+	operation   Operation
+	object      runtime.Object
+	oldObject   runtime.Object
+	userInfo    user.Info
+}
+```
+
 ## type Handler struct
 每个plugin 都会有一个`type Handler struct`对象，提供 Handls()函数。
 各个plugin会在其Handls()函数中声明自己能够处理哪些请求，比如create、delete、update。
@@ -308,3 +325,7 @@ const (
 - type chainAdmissionHandler []Interface汇总了所有的plugin
 - 各个plugin，以及/pkg/admission/plugins.go中的plugin注册等函数
 - type Handler struct，记录了一个plugin能够处理的请求类型
+
+一个Admission controller plugin声明了自己需要对什么动作进行检查。 
+同时，在创建如podEvaluator这些具体的Evaluator的时候，也针对自身的Kind声明了只需要对什么动作进行检查。 
+所以，只有两边有交集的时候，一个plugin才会对一个Kind的进行quota检查。
