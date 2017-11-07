@@ -370,7 +370,10 @@ reousrce = unversioned.APIResource{
 ```
 
 - Kind  
-那么可以得出，Kind就是定义在`/kubernetes-1.5.2/pkg/api/types.go`中的各种结构体，这里的`/kubernetes-1.5.2/pkg/api/types.go`的数据结构都是internal version的对象。如
+
+Kind is a string value representing the REST resource this object represents. 
+可以看出，Kind就是定义在`/kubernetes-1.5.2/pkg/api/types.go`中的各种结构体，这里的`/kubernetes-1.5.2/pkg/api/types.go`的数据结构都是internal version的对象。如：
+
 ```go
 type Pod struct
 type PodList struct
