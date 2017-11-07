@@ -245,8 +245,8 @@ func RegisterPlugin(name string, plugin Factory) {
 ```
 
 ## type Handler struct
-每个plugin 都会有一个Handler()函数，而type Handler struct就是用来生成及处理Handler()函数的。 
-各个plugin会在其Handler()函数中声明自己能够处理哪些请求，比如create、delete、update。
+每个plugin 都会有一个`type Handler struct`对象，提供 Handls()函数。
+各个plugin会在其Handls()函数中声明自己能够处理哪些请求，比如create、delete、update。
 ```go
 // Handler is a base for admission control handlers that
 // support a predefined set of operations
