@@ -1,5 +1,12 @@
 # Admission Control机制之Resource Quota
 
+**Table of Contents**
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+  - [plugin注册](#plugin注册)
+  - [type quotaEvaluator struct](#type-quotaevaluator-struct)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 ## plugin注册
 各个Admission Control plugin在初始化的时候会向apiserver注册，见/cmd/kube-apiserver/app/plugins.go
 ```go
@@ -687,8 +694,9 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 ```
 
 # 总结
-1. quotaEvaluator.work中是以ns为key来存放request，然后一次性取走一个ns的所有request来进行处理
-2. Evaluate()->run()->doWork()->checkAttributes()-->checkQuotas()-->checkRequest()
+1. type quotaEvaluator struct是进行具体quota检测的主体
+2. quotaEvaluator.work中是以ns为key来存放request，然后一次性取走一个ns的所有request来进行处理
+3. Evaluate()->run()->doWork()->checkAttributes()-->checkQuotas()-->checkRequest()
 
 
 
