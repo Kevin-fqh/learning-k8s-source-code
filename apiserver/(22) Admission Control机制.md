@@ -108,7 +108,7 @@ func NewFromPlugins(client clientset.Interface, pluginNames []string, configFile
 
 ### Admit 
 使用每个plugin对请求进行检查。如果一个plugin不能处理该请求的动作，则直接略过。 
-每个plugin都实现有Admit()方法。 
+每个plugin都实现有Admit()方法，都有一个handler对象 。
 ```go
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
 /*
@@ -120,7 +120,7 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 
 	for _, handler := range admissionHandler {
 		/*
-			ResourceQuota的Handles函数定义在
+			ResourceQuota的Handler定义在
 				==>/plugin/pkg/admission/resourcequota/admission.go
 					==>func NewResourceQuota
 						==>Handler:   admission.NewHandler(admission.Create, admission.Update),
