@@ -66,6 +66,7 @@ WithAuthentication()会创建一个http handler，会对指定的request进行�
 认证的返回信息的一个user，WithAuthentication()会把这些user信息附加到该request的context上。 
 - 如果身份认证失败或返回错误，则使用失败的handler来进行处理。 
 - 如果成功，会从request的header中删除"Authorization"信息，并调用handler来为该request提供服务。 
+
 见/pkg/auth/handlers/handlers.go
 
 ```go
@@ -115,6 +116,7 @@ func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, a
 ```
 
 这里的`user, ok, err := auth.AuthenticateRequest(req)`调用的正是定义在`/plugin/pkg/auth/authenticator/request/union/union.go`中的AuthenticateRequest()。 
+
 这就和[Authenticator机制]()一文中的流程对应上了。 
 
 
