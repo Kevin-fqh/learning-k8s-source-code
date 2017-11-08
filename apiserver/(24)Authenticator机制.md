@@ -47,6 +47,9 @@ go func() {
 ***
 
 6. /pkg/auth/handlers/handlers.go中 func WithAuthentication
+```go
+user, ok, err := auth.AuthenticateRequest(req)
+```
 7. /plugin/pkg/auth/authenticator/request/union/union.go 中 func (authHandler *unionAuthRequestHandler) AuthenticateRequest
 8. /pkg/auth/group/group_adder.go中 func (g *GroupAdder) AuthenticateRequest
 9. 再到具体的Authenticator的自身的认证函数，如keystone的func AuthenticatePassword()

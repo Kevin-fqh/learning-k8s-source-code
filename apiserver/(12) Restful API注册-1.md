@@ -459,6 +459,9 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	*/
 	s.installAPI(c.Config)
 
+	/*
+		BuildHandlerChainsFunc封装了一些对Request进行认证、授权、审计等相关的handler
+	*/
 	s.Handler, s.InsecureHandler = c.BuildHandlerChainsFunc(s.HandlerContainer.ServeMux, c.Config)
 
 	return s, nil
