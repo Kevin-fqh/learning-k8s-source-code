@@ -4,7 +4,7 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [Authentication strategies](#authentication-strategies)
   - [一个request请求经历认证的流程](#一个request请求经历认证的流程)
-  - [初始化加载Authentication Plugin](#初始化加载Authentication Plugin)
+  - [初始化加载Authentication Plugin](#初始化加载authentication-plugin)
   - [type KeystoneAuthenticator struct](#type-keystoneauthenticator-struct)
   - [type Authenticator struct](#type-authenticator-struct)
   - [type unionAuthRequestHandler struct](#type-unionauthrequesthandler-struct)
