@@ -98,5 +98,11 @@ etcd的watch是没有过滤功能的，而kube-apiserver增加了过滤功能。
 etcd只能watch到pod的add、delete、update。
 kube-apiserver则增加了过滤功能，将订阅方感兴趣的部分资源发给订阅方。
 
+## 一个Restful请求需要经过的流程
+
+Authentication-->Authorization-->Admission Control
+
+![一个请求需要经过的流程](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/access-control-overview.jpg)
+
 ## 参考
 [如何扩展Kubernetes管理的资源对象](http://dockone.io/article/2405)
