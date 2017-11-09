@@ -4,7 +4,7 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [定义](#定义)
   - [ThreadSafeStore](#threadsafestore)
-  - [type threadSafeMap struc 用法](#type-threadsafemap-struc-用法)
+  - [type threadSafeMap struct 用法](#type-threadsafemap-struct-用法)
   - [type cache struct](#type-cache-struct)
   - [Demo](#demo)
 <!-- END MUNGE: GENERATED_TOC -->
@@ -106,7 +106,7 @@ func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
 而items中存入的就是key和obj。 
 所以说，在ThreadSafeStore中的Index只负责obj的key的管理。
 
-## type threadSafeMap struc 用法
+## type threadSafeMap struct 用法
 1. 在threadSafemap中，首先通过indexers[name]获取IndexFunc，然后使用IndexFunc计算obj的indexkey。
 2. 然后通过Indices[name]获取具体的Index；结合indexkey，就可以获取到具体obj的key，然后在items[key]获取obj的具体值。
 3. IndexFunc是threadSafemap使用
