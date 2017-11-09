@@ -162,7 +162,7 @@ An API Group, a Version and a Resource (GVR) uniquely defines a HTTP path:
 
 那么，当HTTP请求命中Kubernetes API时，会发生了什么呢？
 在一个较高的层次上，会发生以下交互：
-1. HTTP请求首先由在`DefaultBuildHandlerChain（）`中注册的过滤器链进行处理。 该过滤器对其执行操作（有关过滤器的更多详细信息，请参阅下文）。 过滤器通过并附加相应信息到`ctx.RequestInfo`，例如经过身份验证的user或返回适当的HTTP响应代码。
+1. HTTP请求首先由在`DefaultBuildHandlerChain（）`中注册的过滤器链进行处理。 该过滤器对其执行过滤操作（有关过滤器的更多详细信息，请参阅下文）。 过滤器通过并附加相应信息到`ctx.RequestInfo`，例如经过身份验证的user或返回适当的HTTP响应代码。
 2. 接下来，多路复用器multiplexer（参见container.go）根据HTTP路径将HTTP请求路由到相应的处理程序。
 3. 路由routes（在 `routes/*` 中定义）连接handler处理程序与HTTP路径。
 4. 在API Group中注册的handler负责接收HTTP请求和上下文context（如用户，权限等），并从storage中获取请求的object。

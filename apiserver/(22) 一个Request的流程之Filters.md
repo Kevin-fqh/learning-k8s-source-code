@@ -5,11 +5,14 @@
   - [引言](#引言)
   - [DefaultBuildHandlerChain](#defaultbuildhandlerchain)
   - [WithAuthentication](#withauthentication)
+  - [参考](#参考)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
 ## 引言
-在[deep dive]()系列中提到过：当HTTP请求命中Kubernetes API时，HTTP请求首先由在`DefaultBuildHandlerChain（）`中注册的过滤器链进行处理。 该过滤器对其执行操作。 过滤器通过并附加相应信息到`ctx.RequestInfo`，例如经过身份验证的user或返回适当的HTTP响应代码。
+在[deep dive]()系列中提到过：当HTTP请求命中Kubernetes API时，HTTP请求首先由在`DefaultBuildHandlerChain（）`中注册的过滤器链进行处理。 
+该过滤器对其执行一系列过滤操作。 
+过滤器通过并附加相应信息到`ctx.RequestInfo`，例如经过身份验证的user或返回适当的HTTP响应代码。
 
 ![API-server-flow](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/API-server-flow.png)
 
@@ -117,7 +120,17 @@ func WithAuthentication(handler http.Handler, mapper api.RequestContextMapper, a
 
 这里的`user, ok, err := auth.AuthenticateRequest(req)`调用的正是定义在`/plugin/pkg/auth/authenticator/request/union/union.go`中的AuthenticateRequest()。 
 
-这就和[Authenticator机制]()一文中的流程对应上了。 
+这就和`认证机制`一文中的流程对应上了，见[Authenticator机制]()。 
+
+## 参考
+[accessing the api](https://kubernetes.io/docs/admin/accessing-the-api/)
+
+[authentication](https://kubernetes.io/docs/admin/authentication/)
+
+[authorization](https://kubernetes.io/docs/admin/authorization/)
+
+[admission-controllers](https://kubernetes.io/docs/admin/admission-controllers/)
+
 
 
 
