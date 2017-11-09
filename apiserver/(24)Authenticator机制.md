@@ -14,11 +14,11 @@
 ## Authentication strategies
 Authenticator步骤的输入是整个HTTP请求，但是，它通常只是检查HTTP Headers and/or client certificate。
 
-可以指定多个Authenticator模块，在这种情况下，每个认证模块都按顺序尝试，直到其中一个成功。
+可以指定多个Authenticator模块，在这种情况下，每个认证模块都按顺序尝试，直到其中一个成功即可。
 
-如果请求无法通过认证，则会被HTTP状态码401拒绝。 否则，用户将被认证为特定的`username`，并且username可供后续步骤用于其决策。  有部分authenticators会提供user的group memberships信息。
+如果认证成功，则用户的`username`会传入授权模块做进一步授权验证；而对于认证失败的请求则返回HTTP 401。
 
-虽然Kubernetes在访问控制决策和请求记录中使用`username`，但它没有用户对象，也不在用户对象存储中存储有关用户的用户名或其他信息。
+虽然Kubernetes在访问控制决策和请求记录中使用`username`，但它没有用户对象，也不在用户对象存储中存储有关用户的username或其他信息。
 
 Kubernetes使用client certificates, bearer tokens, an authenticating proxy, or HTTP basic auth, 通过身份验证插件对API请求进行身份验证。 当向API服务器发出一个HTTP请求，Authentication plugin会尝试将以下属性与请求关联：
 - Username: 标识终端用户的字符串, 常用值可能是kube-admin或jane@example.com。

@@ -22,6 +22,8 @@ kubernetes 有3个层次的资源限制方式，分别在Container、Pod、Names
 
 同时Admission Control也会被用来给系统的某些对象设置默认值，以防止用户不提供对应的值。
 
+不同于授权和认证只关心请求的用户和操作，准入控制还处理请求的内容，并且仅对创建、更新、删除或连接（如代理）等有效，而对读操作无效。
+
 推荐的plugin设置顺序如下：
 ```go
 --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds

@@ -1121,6 +1121,8 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 
 11. 更新完一个rc资源之后，把其放入queue workqueue.RateLimitingInterface中，等待ReplicationManager的worker的处理，确保Pod副本数与rc规定的相同。
 
+12. 从Kubernetes 1.7开始，所有需要监控资源变化情况的调用均推荐使用Informer。 Informer提供了基于事件通知的只读缓存机制，可以注册资源变化的回调函数，并可以极大减少API的调用。
+
 
 
 
