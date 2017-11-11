@@ -51,7 +51,7 @@ ubuntu              latest              dd6f76d9cc90        6 days ago          
 24K	./volumes
 ```
 可以发现仅仅有`/image`和`/overlay`发生了变化。 
-可以推断`/image`是维护镜像的层级信息，而`/overlay`则是存储实际的layer级内容。
+可以推断`/image`是维护镜像的层级配置信息，而`/overlay`则是存储实际的layer级内容。
 
 ## image 目录分析
 image目录下会根据底层存储驱动的类型进行分类，我们现在是overlay，在overlay目录下，有着下述文件和目录：
@@ -115,8 +115,9 @@ dd6f76d9cc90f3ec2bded9e1c970bb6a8c5259e05401b52df42c997dec1e79be  ./dd6f76d9cc90
 
 ### layerdb 目录
 目前只有两个目录：
-    * sha256 目录: 存储layer信息；
-    * tmp: 临时目录
+- sha256 目录: 存储layer信息；
+- tmp: 临时目录
+
 ```shell
 [root@fqhnode01 layerdb]# tree /home/docker-test-dir/image/overlay/layerdb
 /home/docker-test-dir/image/overlay/layerdb
@@ -181,6 +182,7 @@ dd6f76d9cc90f3ec2bded9e1c970bb6a8c5259e05401b52df42c997dec1e79be  ./dd6f76d9cc90
 "sha256:0f5ff0cf6a1c53f94b15f03536c490040f233bc455f1232f54cc8eb344a3a368 sha256:f1c896f31e4935defe0f9714c011ee31b3179ac745a4ed04e07c2e6ef2a7c349"
 ```
     * 对合并后的值进行计算sha256编码得出ubuntu镜像第二层的 ChainID, 这里需要用"crypto/sha256"来进行计算。用sha256sum求与GO语言求得到的结果不一样，因为cat或echo会在字符串后加’\n’。
+	
 ```go
 package main
 
@@ -198,7 +200,8 @@ func main() {
 }
 ```
     * 输出内容如下，这就是ubuntu镜像的第二层
-```
+	
+```shell
 a25db7dbfd3205a483f67bfaa81de9924b6c687c4f1b3ccf6bd42da9bc7387ad
 ```
 
@@ -213,12 +216,12 @@ a25db7dbfd3205a483f67bfaa81de9924b6c687c4f1b3ccf6bd42da9bc7387ad
 # ls
 cache-id  diff  parent  size  tar-split.json.gz
 ```
-    * cache-id :记录着本层内容真正存储的位置
-    * diff :本层的diff_id
-    * size :本层的大小
-	* tar-split.json.gz
-	* parent : 上一层的ChainID，如果本层是一个镜像的第一层，不会有parent文件
 
+* cache-id :记录着本层内容真正存储的位置
+* diff :本层的diff_id
+* size :本层的大小
+* tar-split.json.gz
+* parent : 上一层的ChainID，如果本层是一个镜像的第一层，不会有parent文件
 
 最后根据`cache-id`来查找一层内容真正存储的地方
 ```shell
@@ -235,8 +238,8 @@ fb8689ec83db4eab9f5ab10719ecd98e71ad20158c0c95d768e7dd17763b0ae1
 可以发现这里的目录和`cache-id`的值都是一一对应的。
 
 至此，docker是怎么管理一个镜像所有的layer层基本清楚。 后面需要了解的是
-    * docker是如何从一个镜像的tar包中得出其配置信息，计算其`rootfs`信息，特别是 diff_ids 的值。
-    * docker启动一个容器的时候，怎么获取一个镜像
+- docker是如何从一个镜像的tar包中得出其配置信息，计算其`rootfs`信息，特别是 diff_ids 的值。
+- docker启动一个容器的时候，怎么获取一个镜像
 	
 ## 解压镜像tar包
 用tar命令解压ubuntu镜像的tar包，内容如下：
@@ -317,9 +320,9 @@ json文件中的id号就是本层的目录名字。
     }
 ]
 ```
-    * Config字段为config的文件名
-    * Layers为镜像tar包中的存储位置,据此可以计算出每一层的 diff_ids 值
-	* RepoTags标明镜像名
+- Config字段为config的文件名
+- Layers为镜像tar包中的存储位置,据此可以计算出每一层的 diff_ids 值
+- RepoTags标明镜像名
 
 其中Layers字段中的层级是按顺序排列的，也就是说ubuntu镜像的第一层是ab217d62e9ea5cc3133ccf9223284fbe9c2bdf899d276c731463646de631a8d5。 那么我们据此来计算其 diff_ids 值：
 ```shell
@@ -370,9 +373,9 @@ e7530a5fe331bd4a63094d0c62f2ad010cbe5866910f0071a8f171468317482c
 ```
 
 查看e7530a5fe331bd4a63094d0c62f2ad010cbe5866910f0071a8f171468317482c容器目录，发现以下文件：
-    * init-id，容器的init目录，这里内容是  555a92ef59e6f46885577ba05f9c860e166844703458cf41a13e0270f24ca972-init
-    * mount-id，容器的启动目录，这里内容是 555a92ef59e6f46885577ba05f9c860e166844703458cf41a13e0270f24ca972
-    * parent，容器使用的镜像的最后一层的ChainID，这里内容是 sha256:6428d162737d88c3d35c01efc0eacf39eb1b040f7c5aea7ed30e72d062a36d89
+- init-id，容器的init目录，这里内容是  555a92ef59e6f46885577ba05f9c860e166844703458cf41a13e0270f24ca972-init
+- mount-id，容器的启动目录，这里内容是 555a92ef59e6f46885577ba05f9c860e166844703458cf41a13e0270f24ca972
+- parent，容器使用的镜像的最后一层的ChainID，这里内容是 sha256:6428d162737d88c3d35c01efc0eacf39eb1b040f7c5aea7ed30e72d062a36d89
 	
 查看此时docker工作目录下的`/overlay`目录
 ```shell
