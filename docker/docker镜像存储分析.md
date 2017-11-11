@@ -177,12 +177,12 @@ dd6f76d9cc90f3ec2bded9e1c970bb6a8c5259e05401b52df42c997dec1e79be  ./dd6f76d9cc90
 2. 第一个 diff_id 值是 0f5ff0cf6a1c53f94b15f03536c490040f233bc455f1232f54cc8eb344a3a368，那么ubuntu镜像的第一层的 ChainID 就是 0f5ff0cf6a1c53f94b15f03536c490040f233bc455f1232f54cc8eb344a3a368。
 
 3. 第二个 diff_id 值是 f1c896f31e4935defe0f9714c011ee31b3179ac745a4ed04e07c2e6ef2a7c349，这里要分两步来进行。
-  - 和前一个 ChainID 合并（前一层的ChainID + " " +本层的diff_id)
+    - 和前一个 ChainID 合并（前一层的ChainID + " " +本层的diff_id)
 ```shell
 "sha256:0f5ff0cf6a1c53f94b15f03536c490040f233bc455f1232f54cc8eb344a3a368 sha256:f1c896f31e4935defe0f9714c011ee31b3179ac745a4ed04e07c2e6ef2a7c349"
 ```
 
-  - 对合并后的值进行计算sha256编码得出ubuntu镜像第二层的 ChainID, 这里需要用"crypto/sha256"来进行计算。用sha256sum求与GO语言求得到的结果不一样，因为cat或echo会在字符串后加’\n’。
+    - 对合并后的值进行计算sha256编码得出ubuntu镜像第二层的 ChainID, 这里需要用"crypto/sha256"来进行计算。用sha256sum求与GO语言求得到的结果不一样，因为cat或echo会在字符串后加’\n’。
 ```go
 package main
 
@@ -200,7 +200,7 @@ func main() {
 }
 ```
 
-  - 输出内容如下，这就是ubuntu镜像的第二层
+    - 输出内容如下，这就是ubuntu镜像的第二层
 ```shell
 a25db7dbfd3205a483f67bfaa81de9924b6c687c4f1b3ccf6bd42da9bc7387ad
 ```
