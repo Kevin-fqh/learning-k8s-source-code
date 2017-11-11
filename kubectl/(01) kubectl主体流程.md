@@ -6,7 +6,7 @@
   - [func NewFactory](#cmd-factory)
   - [创建kubectl命令](#创建kubectl命令)
   - [kubectl get 为例](#添加get命令)
-    - [func (f *factory) UnstructuredObject()](#func-f-factory-unstructuredobject
+    - [func (f *factory) UnstructuredObject()](#func-f-factory-unstructuredobject)
     - [过滤函数和过滤参数](#过滤函数和过滤参数)
     - [Builder](#builder)
     - [infos](#infos)
