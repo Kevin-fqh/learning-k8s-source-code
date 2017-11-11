@@ -6,10 +6,10 @@
   - [func NewFactory](#cmd-factory)
   - [创建kubectl命令](#创建kubectl命令)
   - [kubectl get 为例](#添加get命令)
-    - func (f *factory) UnstructuredObject()
-    - 过滤函数和过滤参数
-    - Builder
-    - infos
+    - [func (f *factory) UnstructuredObject()](#func-f-factory-unstructuredobject
+    - [过滤函数和过滤参数](#过滤函数和过滤参数)
+    - [Builder](#builder)
+    - [infos](#infos)
   - [总结](#总结)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -222,7 +222,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		
 	/*
 		根据cmd来获取输出的printer
-		generic的值和具体格式有关，如指定为json或者yaml格式的时候，generic＝true
+		generic的值和具体格式有关，一般情况下generic＝true
 		==>定义在/pkg/kubectl/cmd/util/printing.go
 			==>func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error)
 		这里的printer会在generic＝true的时候使用
