@@ -770,14 +770,12 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 		使用NewYAMLOrJSONDecoder生成一个Decoder，把指定YAML文档或JSON文档作为一个stream来进行处理
 			==>定义在/pkg/util/yaml/decoder.go中
 				==>func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder
-
-		4096代表了会把stream解析成json格式
 	*/
 	d := yaml.NewYAMLOrJSONDecoder(v.Reader, 4096)
 	for {
 		ext := runtime.RawExtension{}
 		/*
-			用解码器对stream进行解析，4096代表了会把stream解析成json格式
+			用解码器对stream进行解析
 		*/
 		if err := d.Decode(&ext); err != nil {
 			if err == io.EOF {
