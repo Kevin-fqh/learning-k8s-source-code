@@ -341,6 +341,7 @@ func (r *LineReader) Read() ([]byte, error) {
 apiVersion: v1
 kind: Pod
 ```
+或者读取一个json文件
 
 ```go
 package main
@@ -358,7 +359,7 @@ type generic map[string]interface{}
 func main() {
 	filePath := "/Users/fanqihong/Desktop/go-project/src/ftmtest/mysql.yaml"
 	input := openFile(filePath)
-	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(input)), 10)
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(input)), 4096)
 	objs := []generic{}
 
 	var err error
@@ -382,13 +383,12 @@ func openFile(path string) []byte {
 	if err != nil {
 		fmt.Println(err)
 	}
-	data := make([]byte, 100)
+	data := make([]byte, 4096)
 	count, err := file.Read(data)
 	if err != nil {
 		fmt.Println(err)
 	}
 	defer file.Close()
 	return data[:count]
-
 }
 ```
