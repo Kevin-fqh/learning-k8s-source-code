@@ -350,7 +350,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"ftmtest/yaml"
+	"k8s.io/kubernetes/pkg/util/yaml"
 	"io"
 	"os"
 )
