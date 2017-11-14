@@ -337,6 +337,7 @@ func (r *LineReader) Read() ([]byte, error) {
 ```
 
 ## Demo
+这里实现了把一个json文件或者yaml文件中的数据转化为一个`type generic map[string]interface{}`类型进行输出
 ```yaml
 apiVersion: v1
 kind: Pod
