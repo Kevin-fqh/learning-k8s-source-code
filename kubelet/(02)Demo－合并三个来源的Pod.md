@@ -175,19 +175,33 @@ package main
 import (
 	"fmt"
 	"kubelet-collect-pod-demo/src/merge"
+	"sync"
 )
 
 type intStorage struct {
-	source string
-	update interface{} //所有的input channel会汇总到这里进行输出
+	update    chan string //要处理的数据类型是string
+	updatLock sync.Mutex
 }
 
 func (s intStorage) Merge(source string, update interface{}) error {
+	s.updatLock.Lock()
+	defer s.updatLock.Unlock()
 	//	if source == "http" {
 	//	}
 	st := fmt.Sprintf("source is %s, Got value %s", source, update.(string))
 	fmt.Println(st)
+	obj := update.(string)
+	s.update <- obj
 	return nil
+}
+
+func (s intStorage) Customer() {
+	for {
+		select {
+		case st := <-s.update:
+			fmt.Println("消费", st)
+		}
+	}
 }
 
 func HttpInput(chHttp chan<- interface{}) {
@@ -206,19 +220,28 @@ func FileInput(chFile chan<- interface{}) {
 }
 
 func main() {
-	storage := intStorage{}
+	chupdate := make(chan string, 50)
+	storage := intStorage{
+		update: chupdate,
+	}
 	mux := merge.NewMux(storage)
 	go HttpInput(mux.Channel("http"))
 	go FileInput(mux.Channel("file"))
+	go storage.Customer()
 	select {}
 }
 ```
 
 输出如下
 ```
-source is http, Got value hello
-source is http, Got value world
 source is file, Got value I
 source is file, Got value am
 source is file, Got value file
+source is http, Got value hello
+消费 I
+消费 am
+消费 file
+消费 hello
+source is http, Got value world
+消费 world
 ```
