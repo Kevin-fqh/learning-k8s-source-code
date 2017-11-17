@@ -168,7 +168,7 @@ func (m *Mux) listen(source string, listenChannel <-chan interface{}) {
 ```
 
 ## main()
-模仿两个生产者file和http
+模仿两个生产者file和http, 假设要处理的数据类型是 string
 ```go
 package main
 
@@ -178,12 +178,12 @@ import (
 	"sync"
 )
 
-type intStorage struct {
+type testStorage struct {
 	update    chan string //要处理的数据类型是string
 	updatLock sync.Mutex
 }
 
-func (s intStorage) Merge(source string, update interface{}) error {
+func (s testStorage) Merge(source string, update interface{}) error {
 	s.updatLock.Lock()
 	defer s.updatLock.Unlock()
 	//	if source == "http" {
@@ -195,7 +195,7 @@ func (s intStorage) Merge(source string, update interface{}) error {
 	return nil
 }
 
-func (s intStorage) Customer() {
+func (s testStorage) Customer() {
 	for {
 		select {
 		case st := <-s.update:
@@ -221,7 +221,7 @@ func FileInput(chFile chan<- interface{}) {
 
 func main() {
 	chupdate := make(chan string, 50)
-	storage := intStorage{
+	storage := testStorage{
 		update: chupdate,
 	}
 	mux := merge.NewMux(storage)
