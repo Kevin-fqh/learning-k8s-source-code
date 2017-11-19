@@ -1,6 +1,6 @@
 # Some Tips
 
-1. fmt.Printf()、数组的数据类型
+## fmt.Printf()、数组的数据类型
 输出一个值的类型
 
 以下为数组在 Go 和 C 中的主要区别。在 Go 中,
@@ -25,7 +25,7 @@ func main() {
 [3]int 
 ```
 
-2. defer语句
+## defer语句
 defer 语句用于预设一个函数调用(即推迟执行函数)。
 
 被推迟函数的实参(如果该函数为方法则还包括接收者)在推迟执行时就会求值, 而不是在真正调用执行时才求值。 
@@ -64,10 +64,26 @@ leaving: a
 leaving: b
 ```
 
-3. golang中的nil
+## golang中的nil
+1. nil没有type
+2. 在Go语言中，未显示初始化的变量拥有其类型的zero value。 共有6种类型变量的zero value是nil，包括：pointer，slice，map，channel，function和interface。
 
+```
+类型	                     nil值含义
+pointer	                 指向nothing
+slice	                 slice变量中的3个成员值：buf为nil（没有backing array），len和cap都是0
+map，channel，function	 一个nil pointer，指向nothing
+interface	             interface包含”type, value”，一个nil interface必须二者都为nil: ”nil, nil”
+```
 
-4. panic-1
+由于Go中interface会同时存储类型和值，如果将一个nil对象赋值给一个interface，这个interface为非nil。
+
+nil只能赋值给指针、channel、func、interface、map或slice类型的变量。
+如果将nil赋值给其他变量的时候将会引发panic。
+
+见[理解Go中的nil](https://studygolang.com/topics/2863)
+
+## panic-1
 当 panic 被调用后(包括不明确的运行时错误,例如切片检索越界或类型断言失败), 
 程序将立刻终止当前函数的执行,并开始回溯Go程的栈, 运行任何被推迟的函数。
 若回溯到达 Go 程栈的顶端,程序就会终止。
@@ -123,7 +139,7 @@ recover : this is panic
 start
 ```
 
-4. panic-2
+## panic-2
 ```go
 package main
 
