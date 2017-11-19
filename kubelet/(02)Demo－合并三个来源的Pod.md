@@ -190,7 +190,11 @@ func (s testStorage) Merge(source string, update interface{}) error {
 	//	}
 	st := fmt.Sprintf("source is %s, Got value %s", source, update.(string))
 	fmt.Println(st)
-	obj := update.(string)
+	obj, ok := update.(string)
+	if !ok {
+		fmt.Println("not a string")
+		return nil
+	}
 	s.update <- obj
 	return nil
 }
