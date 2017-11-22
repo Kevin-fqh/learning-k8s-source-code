@@ -28,8 +28,8 @@ func main() {
 ## defer语句
 defer 语句用于预设一个函数调用(即推迟执行函数)。
 
-被推迟函数的实参(如果该函数为方法则还包括接收者)在推迟执行时就会求值, 而不是在真正调用执行时才求值。 
-这样无需担心变量值在函数执行时被改变。
+被推迟函数的`实参`(如果该函数为方法则还包括接收者)在`声明时`就会求值, 而不是在真正调用执行时才求值。 
+这样无需担心变量值在函数执行时被改变。 但被推迟函数的函数体是在最后执行的时候才会执行。
 
 在下面的例子中，声明` defer un(trace("a"))`时，un()函数是作为被推迟函数，那么un()函数的参数在声明的时候就会进行求值，而不是到真正执行un()函数时再去求值。
 
@@ -64,6 +64,39 @@ leaving: a
 leaving: b
 ```
 
+再看一个例子，其输出是 132
+```go
+package main
+
+import (
+	"fmt"
+)
+
+type Slice []int
+
+func NewSlice() Slice {
+	return make(Slice, 0)
+}
+func (s *Slice) Add(elem int) *Slice {
+	*s = append(*s, elem)
+	fmt.Print(elem)
+	return s
+}
+func main() {
+	s := NewSlice()
+	defer s.Add(1).Add(2)
+	s.Add(3)
+}
+```
+
+defer语句有可能改变函数的返回值，下面例子将返回 2
+```go
+func c() (i int) {
+    defer func() { i++ }()
+    return 1
+}
+```
+
 ## golang中的nil
 1. nil没有type
 2. 在Go语言中，未显示初始化的变量拥有其类型的zero value。 共有6种类型变量的zero value是nil，包括：pointer，slice，map，channel，function和interface。
@@ -83,7 +116,7 @@ nil只能赋值给指针、channel、func、interface、map或slice类型的变�
 
 见[理解Go中的nil](https://studygolang.com/topics/2863)
 
-## panic-1
+## panic
 当 panic 被调用后(包括不明确的运行时错误,例如切片检索越界或类型断言失败), 
 程序将立刻终止当前函数的执行,并开始回溯Go程的栈, 运行任何被推迟的函数。
 若回溯到达 Go 程栈的顶端,程序就会终止。
@@ -95,89 +128,78 @@ nil只能赋值给指针、channel、func、interface、map或slice类型的变�
 
 recover()语句负责处理panic产生的错误。
 
+关键的一点是，即使函数执行的时候panic了，函数不往下走了，运行时并不是立刻向上传递panic，而是到defer那，等defer的东西都跑完了，panic再向上传递。所以这时候 defer 有点类似 try-catch-finally 中的 finally。 
+
+换句话说，一旦panic，逻辑就会走到defer那，那我们就在defer那等着，调用recover函数将会捕获到当前的panic（如果有的话），被捕获到的panic就不会向上传递了，于是，世界恢复了和平。你可以干你想干的事情了。
+
+不过要注意的是，recover之后，逻辑并不会恢复到panic那个点去，函数还是会在defer之后返回。
+
+Go中可以抛出一个panic的异常，然后在defer中通过recover捕获这个异常，然后正常处理。
+
 ```go
 package main
+package main
 
-import (
-	"fmt"
-)
+import "fmt"
 
 func main() {
-	st := []int{1, 2, 3, 4, 5}
-	defer func(s []int) {
-		_ = s
-		fmt.Println("start")
-	}(st)
+	f()
+	fmt.Println("Returned normally from f.")
+}
 
+func f() {
 	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println("recover :", err)
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f", r)
 		}
 	}()
+	fmt.Println("Calling g.")
+	g(0)
+	fmt.Println("Returned normally from g.")
+}
 
-	for k, a := range st {
-		if k > 0 {
-			break
-		}
-		fmt.Println(a)
-		//		debug.PrintStack()
-		panic("this is panic")
+func g(i int) {
+	if i > 1 {
+		fmt.Println("Panicking!")
+		panic(fmt.Sprintf("%v", i))
 	}
-
-	st = []int{2, 2, 2}
-	defer func(s []int) {
-		fmt.Println("end")
-		_ = s
-	}(st)
-
+	defer fmt.Println("Defer in g", i)
+	fmt.Println("Printing in g", i)
+	g(i + 1)
 }
 ```
-理论上的输出如下，实际上可能有差异
+
+输出如下，
 ```
-1
-recover : this is panic
-start
+Calling g.
+Printing in g 0
+Printing in g 1
+Panicking!
+Defer in g 1
+Defer in g 0
+Recovered in f 2
+Returned normally from f.
 ```
 
-## panic-2
-```go
-package main
-
-import (
-	"fmt"
-)
-
-func main() {
-	st := []int{1, 2, 3, 4, 5}
-	defer func(s []int) {
-		_ = s
-		fmt.Println("start")
-	}(st)
-
-	for k, a := range st {
-		if k > 0 {
-			break
-		}
-		fmt.Println(a)
-		//		debug.PrintStack()
-		panic("this is panic")
-	}
-
-	st = []int{2, 2, 2}
-	defer func(s []int) {
-		fmt.Println("end")
-		_ = s
-	}(st)
-
-}
+如果把上面代码中的`recover()`删除了，输出如下：
 ```
-理论上的输出如下，实际上可能有差异
-```
-1
-start
-panic: this is panic
+Calling g.
+Printing in g 0
+Printing in g 1
+Panicking!
+Defer in g 1
+Defer in g 0
+panic: 2
 
 goroutine 1 [running]:
+main.g(0x2)
+	/Users/fanqihong/Desktop/go-project/src/ftmtest/fmttest.go:19 +0x3b6
+main.g(0x1)
+	/Users/fanqihong/Desktop/go-project/src/ftmtest/fmttest.go:23 +0x223
+main.g(0x0)
+	/Users/fanqihong/Desktop/go-project/src/ftmtest/fmttest.go:23 +0x223
+main.f()
+	/Users/fanqihong/Desktop/go-project/src/ftmtest/fmttest.go:12 +0xa3
 main.main()
-	/Users/fanqihong/Desktop/go-project/src/ftmtest/fmttest.go:20 +0x150
+	/Users/fanqihong/Desktop/go-project/src/ftmtest/fmttest.go:6 +0x26
 ```
