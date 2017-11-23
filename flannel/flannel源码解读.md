@@ -7,6 +7,7 @@
   - [NetworkManager](#networkmanager)
   - [subnet分配子网](#subnet分配子网)
   - [运行真正的网络插件backend](#运行真正的网络插件backend)
+  - [运行flannel](#运行flannel)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -744,11 +745,11 @@ type Network interface {
 # etcdctl ls /atomic.io/network/subnets
 
 ```
-![iptables](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/flannel-1.png)
 3. 运行flannel，每个节点都要执行
 ```
 # flanneld -etcd-endpoints=http://192.168.91.200:2379,http://192.168.91.201:2379,http://192.168.91.202:2379,http://192.168.91.203:2379 -etcd-prefix="/coreos.com/network">> /var/log/flanneld.log 2>&1 &
 ```
+![iptables](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/flannel-1.png)
 4. Flanneld网络会自动给每个节点分配一个网段以保证Docker容器在整个集群内的IP唯一，所以需要把一开始就已经存在的Docker网桥删除掉
 ```
 # iptables -t nat -F
