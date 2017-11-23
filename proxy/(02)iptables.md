@@ -8,7 +8,7 @@
     - [匹配条件](#匹配条件)
 	- [处理动作](#处理动作)
   - [Table](#table)
-  - [filter表、nat表、mangle表 作用总结](#filter表-nat表-mangle表-作用总结)
+  - [filter表、nat表、mangle表的作用总结](#filter表-nat表-mangle表的作用总结)
   - [结合kube-proxy源码分析](#结合kube-proxy源码分析)
   - [iptables基本使用命令](#iptables基本使用命令)
   - [参考](#参考)
@@ -66,7 +66,7 @@ Table 有4个，优先顺序从高到低是按照：raw->managle->nat->filter
 
 ![iptables路由次序图](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/iptables路由次序图.png)
 
-## filter表、nat表、mangle表 作用总结
+## filter表、nat表、mangle表的作用总结
 **filter表** 是专门过滤包的，它内建三个链，可以毫无问题地对包进行DROP、LOG、ACCEPT和REJECT等操作。
 - FORWARD链过滤所有不是本地产生的并且目的地不是本地的包，
 - 而 INPUT 是针对那些目的地是本地的包。
