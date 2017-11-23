@@ -735,3 +735,31 @@ type Network interface {
 }
 ```
 
+## 运行flannel
+1. flanneld网络使用etcd来保证一致性，所以需要先配置etcd集群
+2. 设置网段
+```
+# etcdctl set /coreos.com/network/config  '{ "Network": "10.1.0.0/16" }'
+
+# etcdctl ls /atomic.io/network/subnets
+
+```
+![iptables](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/flannel-1.png)
+3. 运行flannel，每个节点都要执行
+```
+# flanneld -etcd-endpoints=http://192.168.91.200:2379,http://192.168.91.201:2379,http://192.168.91.202:2379,http://192.168.91.203:2379 -etcd-prefix="/coreos.com/network">> /var/log/flanneld.log 2>&1 &
+```
+4. Flanneld网络会自动给每个节点分配一个网段以保证Docker容器在整个集群内的IP唯一，所以需要把一开始就已经存在的Docker网桥删除掉
+```
+# iptables -t nat -F
+# ifconfig docker0 down
+# brctl delbr docker0
+```
+![iptables](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/flannel-2.png)
+5. 重启docker服务
+```
+# source /run/flannel/subnet.env
+# docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} >> /var/log/docker.log 2>&1 &
+```
+![iptables](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/flannel-3.png)
+
