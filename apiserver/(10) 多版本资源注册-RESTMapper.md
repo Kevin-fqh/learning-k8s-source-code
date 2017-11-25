@@ -773,6 +773,10 @@ func (m *DefaultRESTMapper) ResourcesFor(input unversioned.GroupVersionResource)
 
 后面将对APiserver如何使用Scheme和Restmapper进行Restful API的注册进行讲解。
 
+RESTMapper用于管理所有对象的信息。
+外部要获取的话，直接通过version，group获取到RESTMapper，然后通过kind类型可以获取到相对应的信息。
+kubectl等组件就是通过这种方式获取的。
+
 ## 参考
 [package-meta](https://godoc.org/github.com/ukai/kubernetes-0/pkg/api/meta)
 
