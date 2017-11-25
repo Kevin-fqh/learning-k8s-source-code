@@ -8,7 +8,7 @@
     - [type ConfigFactory struct](#type-configfactory-struct)
 	- [createConfig](#createconfig)
 	- [Watch-List机制](#watch-list机制)
-	- [6个reflector](#6个reflector)
+	- [8个reflector](#8个reflector)
   - [scheduler.Run和scheduler.scheduleOne](#scheduler-run和scheduler-scheduleone)
   - [genericScheduler.Schedule](#genericscheduler-schedule)
     - [预选](#预选)
@@ -429,8 +429,8 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 }
 ```
 
-### 6个reflector
-这里启动了kube-schduler用到的6个reflector
+### 8个reflector
+这里启动了kube-schduler用到的8个reflector
 ```go
 func (f *ConfigFactory) Run() {
 	/*
