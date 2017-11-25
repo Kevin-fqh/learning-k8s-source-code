@@ -42,12 +42,12 @@ kube-scheduler将PodSpec.NodeName字段为空的Pods逐个进行评分，经过�
 ## 评分策略的注册
 在kube-scheduler的main()函数运行之前，位于plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go的func init() 函数会先运行，完成评分函数的注册。
 
-DefaultProvider有默认的defaultPredicates()、defaultPriorities()，关于详细的评分策略介绍后续再进行介绍。
+DefaultProvider是一个algorithm provider，记录着默认的defaultPredicates()、defaultPriorities()，关于详细的评分策略介绍后续再进行介绍。
 ```go
 func init() {
 	/*
-		init()函数在main运行前就会运行，它会提前将DefaultProvider、FitPredicate(过滤)、Priority(打分加权)注册到factory里面,
-		而DefaultProvider有默认的defaultPredicates()、defaultPriorities()
+		init()函数在main运行前就会运行，它会生成一个algorithm provider
+		注册好默认的预选和优选策略
 	*/
 
 	factory.RegisterAlgorithmProvider(factory.DefaultProvider, defaultPredicates(), defaultPriorities())
@@ -62,6 +62,7 @@ func init() {
 	factory.RegisterPriorityFunction("EqualPriority", scheduler.EqualPriority, 1)
 	...
 	...
+	//这部分都是一些预选策略和优选策略的注册
 	...
 }
 ```
