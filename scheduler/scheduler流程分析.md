@@ -15,6 +15,10 @@
     - [优选](#优选)
     - [selectHost得出最终节点](#selecthost得出最终节点)
   - [总结](#总结)
+  - [Scheduler中的数据结构汇总](#scheduler中的数据结构汇总)
+    - [type ScheduleAlgorithm interface](#type-schedulealgorithm-interface)
+	- [type ScheduleAlgorithm interface](#type-schedulealgorithm-interface)
+	- [type genericScheduler struct](#type-genericscheduler-struct)
   - [参考](#参考)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -918,6 +922,44 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 4. 更新SchedulerCache中Pod的状态(AssumePod)，标志该Pod为scheduled。
 
 5. 向apiserver发送&api.Binding对象，表示绑定成功。如果Bind失败，执行回滚操作。
+
+## Scheduler中的数据结构汇总
+### type AlgorithmProviderConfig struct
+调度算法提供者，FitPredicateKeys代表了一组预选函数，PriorityFunctionKeys代表了一组优选函数。
+```go
+type AlgorithmProviderConfig struct {
+	FitPredicateKeys     sets.String
+	PriorityFunctionKeys sets.String
+}
+```
+
+### type ScheduleAlgorithm interface
+ScheduleAlgorithm是一个实现如何将pod调度到machines上的一个接口。 见/plugin/pkg/scheduler/algorithm/scheduler_interface.go
+```go
+// ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
+// onto machines.
+
+/*
+	type ScheduleAlgorithm interface 是Schedule Algorithm要实现的Schedule接口：
+*/
+type ScheduleAlgorithm interface {
+	Schedule(*api.Pod, NodeLister) (selectedMachine string, err error)
+}
+```
+
+### type genericScheduler struct
+genericScheduler是一个具体的调度者，它实现了type ScheduleAlgorithm interface
+```go
+type genericScheduler struct {
+	cache             schedulercache.Cache
+	predicates        map[string]algorithm.FitPredicate
+	prioritizers      []algorithm.PriorityConfig
+	extenders         []algorithm.SchedulerExtender
+	pods              algorithm.PodLister
+	lastNodeIndexLock sync.Mutex
+	lastNodeIndex     uint64
+}
+```
 
 ## 参考
 [Kubernetes Scheduler源码分析](http://blog.csdn.net/waltonwang/article/details/54565638)
