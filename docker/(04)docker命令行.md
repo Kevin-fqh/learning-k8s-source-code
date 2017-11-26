@@ -187,4 +187,5 @@ wait    container wait      阻塞直到容器停止，然后打印退出代码
 	
 ## 参考
 [Docker 1.13 管理命令](http://dockone.io/article/2059)
+
 [Docker 1.13 Management Commands](https://blog.couchbase.com/docker-1-13-management-commands/)
