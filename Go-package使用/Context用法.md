@@ -10,11 +10,11 @@ type Context interface 是 package context的核心数据结构：
 
 2. Context 对象是线程安全的，你可以把一个 Context 对象传递给任意个数的 gorotuine，对它执行取消操作时，所有 goroutine 都会接收到取消信号。
 
-3. Deadline 方法允许函数确定它们是否应该开始工作。 如果剩下的时间太少，也许这些函数就不值得启动。在代码中，我们也可以使用 Deadline 对象为 I/O 操作设置截止时间。
+3. Deadline() 方法允许函数确定它们是否应该开始工作。 如果剩下的时间太少，也许这些函数就不值得启动。在代码中，我们也可以使用 Deadline 对象为 I/O 操作设置截止时间。
 
 4. Value 方法允许 Context 对象携带request作用域的数据，该数据必须是线程安全的。
 
-5. 一个 Context 不能拥有 Cancel 方法，同时我们也只能 Done channel 接收数据。 背后的原因是一致的：接收取消信号的函数和发送信号的函数通常不是一个。 一个典型的场景是：父操作为子操作操作启动 goroutine，子操作也就不能取消父操作。 作为一个折中，WithCancel 函数提供了一种取消新的 Context 的方法。
+5. 一个 Context 不能拥有 Cancel() 方法，同时我们也只能使用 Done channel 来接收数据。 原因是：接收取消信号的函数和发送取消信号的函数通常不是一个。 一个典型的场景是：父操作为子操作操作启动 goroutine，子操作也就不能取消父操作。 作为一个折中，WithCancel() 函数提供了一种取消新的 Context 的方法。
 
 ```go
 // A Context carries a deadline, a cancelation signal, and other values across
