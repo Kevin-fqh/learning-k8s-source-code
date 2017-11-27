@@ -841,6 +841,19 @@ type Backend interface {
 	importExportBackend
 	registryBackend
 }
+
+type containerBackend interface {
+	Commit(name string, config *backend.ContainerCommitConfig) (imageID string, err error)
+}
+
+type imageBackend interface {
+	ImageDelete(imageRef string, force, prune bool) ([]types.ImageDelete, error)
+	ImageHistory(imageName string) ([]*types.ImageHistory, error)
+	Images(imageFilters filters.Args, all bool, withExtraAttrs bool) ([]*types.ImageSummary, error)
+	LookupImage(name string) (*types.ImageInspect, error)
+	TagImage(imageName, repository, tag string) error
+	ImagesPrune(pruneFilters filters.Args) (*types.ImagesPruneReport, error)
+}
 ```
 
 
