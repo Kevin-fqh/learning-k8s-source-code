@@ -11,6 +11,8 @@
     - [type DaemonCli struct](#type-daemoncli-struct)
 	- [type Server struct](#type-server-struct)
 	- [启动daemonCli](#启动daemoncli)
+	- [路由注册](#路由注册)
+	- [image相关Api](#image相关api)
   - [参考](#参考)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -685,6 +687,162 @@ func (cli *DaemonCli) start(opts daemonOptions) (err error) {
 	return nil
 }
 ```
+
+### 路由注册
+func initRouter 添加各种路由到routers中，然后根据路由表routers来初始化apiServer的路由器
+```go
+func initRouter(s *apiserver.Server, d *daemon.Daemon, c *cluster.Cluster) {
+	/* 获取解码器decoder */
+	decoder := runconfig.ContainerDecoder{}
+
+	/*
+		添加路由
+	*/
+	routers := []router.Router{
+		// we need to add the checkpoint router before the container router or the DELETE gets masked
+		/*
+			添加的顺序有要求
+		*/
+		checkpointrouter.NewRouter(d, decoder),
+		container.NewRouter(d, decoder),
+		/*
+			以image的路为例子
+				==>/api/server/router/image/image.go
+					==>	func NewRouter
+		*/
+		image.NewRouter(d, decoder),
+		systemrouter.NewRouter(d, c),
+		volume.NewRouter(d),
+		build.NewRouter(dockerfile.NewBuildManager(d)),
+		swarmrouter.NewRouter(c),
+		pluginrouter.NewRouter(d.PluginManager()),
+	}
+
+	//网络相关路由
+	if d.NetworkControllerEnabled() {
+		routers = append(routers, network.NewRouter(d, c))
+	}
+
+	if d.HasExperimental() {
+		/*
+			Experimental模式下的api
+		*/
+		for _, r := range routers {
+			for _, route := range r.Routes() {
+				if experimental, ok := route.(router.ExperimentalRoute); ok {
+					experimental.Enable()
+				}
+			}
+		}
+	}
+
+	/*
+		根据设置好的路由表routers来初始化apiServer的路由器
+	*/
+	s.InitRouter(utils.IsDebugEnabled(), routers...)
+}
+
+// InitRouter initializes the list of routers for the server.
+// This method also enables the Go profiler if enableProfiler is true.
+func (s *Server) InitRouter(enableProfiler bool, routers ...router.Router) {
+	s.routers = append(s.routers, routers...)
+
+	m := s.createMux() //真正的api注册
+	if enableProfiler {
+		profilerSetup(m)
+	}
+	s.routerSwapper = &routerSwapper{
+		router: m,
+	}
+}
+```
+
+func (s *Server) createMux()完成真正的api注册
+```go
+// createMux initializes the main router the server uses.
+/*
+	这里进行真正的路由注册，handler(f)
+*/
+func (s *Server) createMux() *mux.Router {
+	m := mux.NewRouter()
+
+	logrus.Debug("Registering routers")
+	for _, apiRouter := range s.routers { //遍历每个路由
+		for _, r := range apiRouter.Routes() { //遍历每个路由的子命令、动作
+			f := s.makeHTTPHandler(r.Handler())
+
+			logrus.Debugf("Registering %s, %s", r.Method(), r.Path())
+			/*
+				在mux.Route路由结构中根据这个r.Path()路径设置一个适配器来匹配方法method和handler。
+				当满足versionMatcher + r.Path()路径的正则表达式要求，就可以适配到相应的方法名及该handler
+			*/
+			m.Path(versionMatcher + r.Path()).Methods(r.Method()).Handler(f)
+			m.Path(r.Path()).Methods(r.Method()).Handler(f)
+		}
+	}
+
+	/*
+		mux.Route没有找到请求数据所对应的方法或函数handler时的处理办法
+	*/
+	err := errors.NewRequestNotFoundError(fmt.Errorf("page not found"))
+	notFoundHandler := httputils.MakeErrorHandler(err)
+	m.HandleFunc(versionMatcher+"/{path:.*}", notFoundHandler)
+	m.NotFoundHandler = notFoundHandler
+
+	return m
+}
+```
+
+### image相关Api
+```go
+// NewRouter initializes a new image router
+func NewRouter(backend Backend, decoder httputils.ContainerDecoder) router.Router {
+	r := &imageRouter{
+		backend: backend,
+		decoder: decoder,
+	}
+	r.initRoutes()
+	return r
+}
+
+// initRoutes initializes the routes in the image router
+func (r *imageRouter) initRoutes() {
+	r.routes = []router.Route{
+		// GET
+		router.NewGetRoute("/images/json", r.getImagesJSON), /*建立一个Get方式的本地路由对象localRoute*/
+		router.NewGetRoute("/images/search", r.getImagesSearch),
+		router.NewGetRoute("/images/get", r.getImagesGet),
+		router.NewGetRoute("/images/{name:.*}/get", r.getImagesGet),
+		router.NewGetRoute("/images/{name:.*}/history", r.getImagesHistory),
+		router.NewGetRoute("/images/{name:.*}/json", r.getImagesByName),
+		// POST
+		router.NewPostRoute("/commit", r.postCommit),
+		router.NewPostRoute("/images/load", r.postImagesLoad),
+		router.Cancellable(router.NewPostRoute("/images/create", r.postImagesCreate)),
+		router.Cancellable(router.NewPostRoute("/images/{name:.*}/push", r.postImagesPush)),
+		router.NewPostRoute("/images/{name:.*}/tag", r.postImagesTag),
+		router.NewPostRoute("/images/prune", r.postImagesPrune),
+		// DELETE
+		router.NewDeleteRoute("/images/{name:.*}", r.deleteImages),
+	}
+}
+```
+
+其中定义在/api/server/router/image/backend.go的type Backend interface声明了提供image相关功能需要实现的函数集合
+```go
+// Backend is all the methods that need to be implemented
+// to provide image specific functionality.
+/*
+	type Backend interface声明了提供image相关功能需要实现的函数集合
+*/
+type Backend interface {
+	containerBackend
+	imageBackend
+	importExportBackend
+	registryBackend
+}
+```
+
 
 ## 参考
 [docker客户端与服务器端通信模块](http://blog.xbblfz.site/2017/04/20/docker客户端与服务器端通信模块一/)
