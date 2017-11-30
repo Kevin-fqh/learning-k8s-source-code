@@ -1,4 +1,4 @@
-# layerStore 初始化过程
+# layerStore 初始化
 
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
@@ -28,9 +28,24 @@ type layerStore struct {
 	layerMap map[ChainID]*roLayer //存放镜像的只读layer信息，/var/lib/docker/image/overlay/layerdb/sha256/
 	layerL   sync.Mutex
 
-	mounts map[string]*mountedLayer //存放镜像的可读写层信息，/var/lib/docker/image/overlay/layerdb/mounts/
+	mounts map[string]*mountedLayer //存放可读写层信息，/var/lib/docker/image/overlay/layerdb/mounts/
 	mountL sync.Mutex
 }
+```
+
+### ChainID和DiffID
+```go
+// ChainID is the content-addressable ID of a layer.
+/*
+	ChainID 是一个用来寻找一个layer层内容的ID编号
+*/
+type ChainID digest.Digest
+
+// DiffID is the hash of an individual layer tar.
+/*
+	DiffID是一个layer.tar的hash，计算方法 sha256sum ./layer.tar
+*/
+type DiffID digest.Digest
 ```
 
 ### type MetadataStore interface
