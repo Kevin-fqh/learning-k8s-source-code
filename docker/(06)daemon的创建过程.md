@@ -60,6 +60,7 @@ func NewDaemon负责真正创建一个type Daemon struct对象，检查一些参
 列出其中的关键核心结构体的创建过程，后面再一一进行分析。
 1. type layerStore struct，记录主机上面所有的layer层信息，包括只读layer和读写layer。其中涉及到graph driver ，主要用来管理容器文件系统及镜像存储的组件,与宿主机对各文件系统的支持相关。
 2. ImageStore，根据所有layer来构建image，维护所有image的元数据
+3. type VolumeStore struct，记录着所有的volumes，同时跟踪它们的使用情况
 
 ```go
 // NewDaemon sets up everything for the daemon to be able to service
