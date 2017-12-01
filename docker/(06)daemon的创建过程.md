@@ -61,6 +61,8 @@ func NewDaemon负责真正创建一个type Daemon struct对象，检查一些参
 1. type layerStore struct，记录主机上面所有的layer层信息，包括只读layer和读写layer。其中涉及到graph driver ，主要用来管理容器文件系统及镜像存储的组件,与宿主机对各文件系统的支持相关。
 2. ImageStore，根据所有layer来构建image，维护所有image的元数据
 3. type VolumeStore struct，记录着所有的volumes，同时跟踪它们的使用情况
+4. type FSMetadataStore struct，使用filesystem来把 layer和image IDs关联起来
+5. reference store是一个tag store，负责管理镜像的tag
 
 ```go
 // NewDaemon sets up everything for the daemon to be able to service
@@ -167,7 +169,6 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 	/*
 		初始化与镜像存储相关的目录及Store
 		  /var/lib/docker/containers 这个目录是用来记录的是容器相关的信息，每运行一个容器，就在这个目录下面生成一个容器Id对应的子目录
-
 	*/
 	daemonRepo := filepath.Join(config.Root, "containers")
 	if err := idtools.MkdirAllAs(daemonRepo, 0700, rootUID, rootGID); err != nil && !os.IsExist(err) {
@@ -180,6 +181,11 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 		}
 	}
 
+	/*
+		graph driver 是主要用来管理容器文件系统及镜像存储的组件,与宿主机对各文件系统的支持相关。
+			比如 ubuntu 上默认使用的是 AUFS , Centos 上是 devicemapper , Coreos 上则是 btrfs 。
+		graph driver 定义了一个统一的、抽象的接口,以一种可扩展的方式对各文件系统提供了支持。
+	*/
 	driverName := os.Getenv("DOCKER_DRIVER")
 	if driverName == "" {
 		driverName = config.GraphDriver
@@ -202,7 +208,10 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 	}
 
 	/*
-		/var/lib/docker/image/${graphDriverName}/layerdb 这个目录是用来记录layer元数据
+		layerStore：记录一个hots主机上面存储着的所有的layer层信息，包括只读layer和读写layer
+		/var/lib/docker/image/${graphDriverName}/layerdb
+		==>/layer/layer_store.go
+			==>func NewStoreFromOptions
 	*/
 	d.layerStore, err = layer.NewStoreFromOptions(layer.StoreOptions{
 		StorePath:                 config.Root,
@@ -233,12 +242,18 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 
 	/*
 		/var/lib/docker/image/${graphDriverName}/imagedb 这个目录是用来记录镜像元数据
+			==>/image/fs.go
 	*/
 	ifs, err := image.NewFSStoreBackend(filepath.Join(imageRoot, "imagedb"))
 	if err != nil {
 		return nil, err
 	}
 
+	/*
+		imageStore：根据所有layer来构建image，维护所有image的元数据
+		根据StoreBackend ifs和 layerStore来创建一个imageStore
+		==>/image/store.go
+	*/
 	d.imageStore, err = image.NewImageStore(ifs, d.layerStore)
 	if err != nil {
 		return nil, err
@@ -246,7 +261,11 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 
 	// Configure the volumes driver
 	/*
+		VolumeStore：记录着所有的volumes，同时跟踪它们的使用情况，相当于volume的一个cache
 		创建/var/lib/docker/volumes/metadata.db，记录volume的元数据
+		Volumes 是一种特殊的目录，其数据可以被一个或多个 container 共享,
+		它和创建它的 container 的生命周期分离开来，
+		在 container 被删去之后能继续存在。
 	*/
 	volStore, err := d.configureVolumes(rootUID, rootGID)
 	if err != nil {
@@ -268,7 +287,9 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 	}
 
 	/*
-		/var/lib/docker/image/${graphDriverName}/distribution 这个目录用来记录layer元数据与镜像元数据之间的关联关系
+		type FSMetadataStore struct，使用filesystem来把 layer和image IDs关联起来
+		/var/lib/docker/image/${graphDriverName}/distribution
+			==>/distribution/metadata/metadata.go
 	*/
 	distributionMetadataStore, err := dmetadata.NewFSMetadataStore(filepath.Join(imageRoot, "distribution"))
 	if err != nil {
@@ -278,7 +299,9 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 	eventsService := events.New()
 
 	/*
-		/var/lib/docker/image/${graphDriverName}/repositories.json 是用来记录镜像仓库元数据
+		reference store是一个tag store，负责管理镜像的tag
+		/var/lib/docker/image/${graphDriverName}/repositories.json 是用来记录镜像仓库元数据，是imagedb 目录的索引
+			==>/reference/store.go
 	*/
 	referenceStore, err := reference.NewReferenceStore(filepath.Join(imageRoot, "repositories.json"))
 	if err != nil {
@@ -373,4 +396,3 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 	return d, nil
 }
 ```
-
