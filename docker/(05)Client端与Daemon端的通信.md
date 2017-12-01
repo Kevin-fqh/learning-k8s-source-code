@@ -689,7 +689,7 @@ func (cli *DaemonCli) start(opts daemonOptions) (err error) {
 ```
 
 ### 路由注册
-func initRouter 添加各种路由到routers中，然后根据路由表routers来初始化apiServer的路由器
+func initRouter 添加各种路由到routers中，然后根据路由表routers来初始化apiServer的路由器。 见/cmd/dockerd/daemon.go
 ```go
 func initRouter(s *apiserver.Server, d *daemon.Daemon, c *cluster.Cluster) {
 	/* 获取解码器decoder */
