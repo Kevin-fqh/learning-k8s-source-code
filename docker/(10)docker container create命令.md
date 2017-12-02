@@ -8,6 +8,8 @@
   - [func create](#func-create)
   - [newContainer](#newcontainer)
 	- [BaseContainer](#basecontainer)
+	- [type CommonContainer struct](#type-commoncontainer-struct)
+	- [创建一个container的RWLayer](#创建一个container的rwlayer)
 	- [MountPoints的设置](#mountpoints的设置)
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -323,6 +325,163 @@ func NewBaseContainer(id, root string) *Container {
 ```
 
 至此，创建一个BaseContainer流程已经完成，那么后面将由daemon继续完成设置该container的属性配置、读写layer设置和注册等工作。
+
+### type CommonContainer struct
+见/container/container.go
+```go
+// CommonContainer holds the fields for a container which are
+// applicable across all platforms supported by the daemon.
+type CommonContainer struct {
+	StreamConfig *stream.Config
+	// embed for Container to support states directly.
+	*State          `json:"State"` // Needed for Engine API version <= 1.11
+	Root            string         `json:"-"` // Path to the "home" of the container, including metadata.
+	/*
+		BaseFS，其值一般会设置为RWLayer的挂载点path，这是一个container整个文件系统的路径
+	*/
+	BaseFS          string         `json:"-"` // Path to the graphdriver mountpoint
+	RWLayer         layer.RWLayer  `json:"-"`
+	ID              string
+	Created         time.Time
+	Managed         bool
+	Path            string
+	Args            []string
+	Config          *containertypes.Config
+	ImageID         image.ID `json:"Image"`
+	NetworkSettings *network.Settings
+	LogPath         string
+	Name            string
+	Driver          string
+	// MountLabel contains the options for the 'mount' command
+	MountLabel             string
+	ProcessLabel           string
+	RestartCount           int
+	HasBeenStartedBefore   bool
+	HasBeenManuallyStopped bool // used for unless-stopped restart policy
+	MountPoints            map[string]*volume.MountPoint
+	HostConfig             *containertypes.HostConfig `json:"-"` // do not serialize the host config in the json, otherwise we'll make the container unportable
+	ExecCommands           *exec.Store                `json:"-"`
+	SecretStore            agentexec.SecretGetter     `json:"-"`
+	SecretReferences       []*swarmtypes.SecretReference
+	// logDriver for closing
+	LogDriver      logger.Logger  `json:"-"`
+	LogCopier      *logger.Copier `json:"-"`
+	restartManager restartmanager.RestartManager
+	attachContext  *attachContext
+}
+```
+
+### 创建一个container的RWLayer
+见/daemon/create.go
+```go
+func (daemon *Daemon) setRWLayer(container *container.Container) error {
+	var layerID layer.ChainID
+	if container.ImageID != "" {
+		img, err := daemon.imageStore.Get(container.ImageID)
+		if err != nil {
+			return err
+		}
+		/*
+			根据img.RootFS中记录的diffID计算出该image的最后一个chainID
+				==>/image/rootfs.go
+					==>func (r *RootFS) ChainID()
+		*/
+		layerID = img.RootFS.ChainID()
+	}
+
+	/*
+		创建该container的RWLayer
+		==>/layer/layer_store.go
+			==>func (ls *layerStore) CreateRWLayer
+	*/
+	rwLayer, err := daemon.layerStore.CreateRWLayer(container.ID, layerID, container.MountLabel, daemon.getLayerInit(), container.HostConfig.StorageOpt)
+
+	if err != nil {
+		return err
+	}
+	container.RWLayer = rwLayer
+
+	return nil
+}
+```
+
+继续CreateRWLayer()
+```go
+func (ls *layerStore) CreateRWLayer(name string, parent ChainID, mountLabel string, initFunc MountInit, storageOpt map[string]string) (RWLayer, error) {
+	ls.mountL.Lock()
+	defer ls.mountL.Unlock()
+	m, ok := ls.mounts[name]
+	if ok {
+		return nil, ErrMountNameConflict
+	}
+
+	var err error
+	var pid string
+	var p *roLayer
+	if string(parent) != "" {
+		p = ls.get(parent)
+		if p == nil {
+			return nil, ErrLayerDoesNotExist
+		}
+		pid = p.cacheID
+
+		// Release parent chain if error
+		defer func() {
+			if err != nil {
+				ls.layerL.Lock()
+				ls.releaseLayer(p)
+				ls.layerL.Unlock()
+			}
+		}()
+	}
+
+	m = &mountedLayer{
+		name:       name, //container.ID
+		parent:     p,    //一个container的读写layer的parent属性是其使用的image的最后一层的ChainID
+		mountID:    ls.mountID(name),
+		layerStore: ls,
+		references: map[RWLayer]*referencedRWLayer{},
+	}
+
+	if initFunc != nil {
+		pid, err = ls.initMount(m.mountID, pid, mountLabel, initFunc, storageOpt)
+		if err != nil {
+			return nil, err
+		}
+		m.initID = pid
+	}
+
+	createOpts := &graphdriver.CreateOpts{
+		StorageOpt: storageOpt,
+	}
+
+	if err = ls.driver.CreateReadWrite(m.mountID, pid, createOpts); err != nil {
+		return nil, err
+	}
+
+	if err = ls.saveMount(m); err != nil {
+		return nil, err
+	}
+
+	return m.getReference(), nil
+}
+```
+其中type mountedLayer struct的定义如下
+```go
+/*
+	实现了/layer/layer.go中的type RWLayer interface
+*/
+type mountedLayer struct {
+	name       string //其值一般是container.ID
+	mountID    string
+	initID     string
+	parent     *roLayer
+	path       string
+	layerStore *layerStore
+
+	references map[RWLayer]*referencedRWLayer
+}
+```
 
 ### MountPoints的设置
 最后，关于该container挂载点的设置需要注意一下规则，一个容器可能会有多个MountPoints，规则如下，按顺序走一遍：
