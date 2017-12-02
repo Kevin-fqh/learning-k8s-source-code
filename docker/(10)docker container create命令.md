@@ -436,8 +436,12 @@ func (ls *layerStore) CreateRWLayer(name string, parent ChainID, mountLabel stri
 	}
 
 	m = &mountedLayer{
-		name:       name, //container.ID
-		parent:     p,    //一个container的读写layer的parent属性是其使用的image的最后一层的ChainID
+		name:   name, //container.ID
+		parent: p,    //一个container的读写layer的parent属性是其使用的image的最后一层的ChainID
+		/*
+			mountID 对应的目录是 /var/docker/overlay/{mountID}
+			Random随机生成的
+		*/
 		mountID:    ls.mountID(name),
 		layerStore: ls,
 		references: map[RWLayer]*referencedRWLayer{},
@@ -473,9 +477,9 @@ func (ls *layerStore) CreateRWLayer(name string, parent ChainID, mountLabel stri
 */
 type mountedLayer struct {
 	name       string //其值一般是container.ID
-	mountID    string
+	mountID    string //对应的目录是 /var/docker/overlay/{mountID}
 	initID     string
-	parent     *roLayer
+	parent     *roLayer //一个container的读写layer的parent属性是其使用的image的最后一层的ChainID
 	path       string
 	layerStore *layerStore
 
