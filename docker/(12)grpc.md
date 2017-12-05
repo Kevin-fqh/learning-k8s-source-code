@@ -5,6 +5,7 @@
   - [Install from source code](#install-from-source-code)
   - [rpc种类](#rpc种类)
   - [简单rpc Demo](#简单rpc-demo)
+  - [客户端流式rpc](#客户端流式rpc)
   - [参考](#参考)
 
 <!-- END MUNGE: GENERATED_TOC -->
@@ -51,12 +52,12 @@ protoc --go_out=plugins,grpc:. helloworld.proto
 
 
 ## rpc种类
-- 简单rpc
-- 客户端流式rpc，客户端使用流，写入一个消息序列并将其发送到服务器。一旦客户端完成写入消息，它等待服务器完成读取返回它的响应。在请求类型前指定 stream 关键字
+- 简单rpc, 客户端发送一个请求，客户端则回应单个响应，然后关闭
+- 客户端流式rpc，客户端通过一个stream发送数据给服务器端，服务器端接收到客户端所有请求后，回送一个应答给客户端。 这里是客户端得到一个stream。 在请求类型前指定 stream 关键字
 ```
  rpc SayHello (stream Point) returns (Length) {}
 ```
-- server端流式rpc，客户端发送请求到服务器，拿到一个流去读取返回的消息序列。 客户端读取返回的流，直到里面没有任何消息。在Response类型前指定 stream 关键字
+- server端流式rpc，客户端发送一个请求，服务器端得到一个stream，服务器端通过这个stream不停的发送数据给客户端，直到关闭，客户端可以用stream读取数据。在Response类型前指定 stream 关键字
 ```
  rpc SayHello (Point) returns (stream Length) {}
 ```
@@ -193,6 +194,144 @@ func main() {
 }
 ```
 
+## 客户端流式rpc
+```proto
+syntax = "proto3";
+
+package user;
+
+message UserRequest {
+    //用户ID
+    int64 uid = 1;
+}
+
+message UserSummary {
+    //描述
+    string description = 1;
+    //用户总数
+    uint32 total       = 2;
+}
+
+service User {
+    /*
+        从客户端到服务端的stream rpc
+            client端用SendUser()来发送数据
+            server端则用SendUser()来接收数据
+    */
+    rpc SendUser(stream UserRequest) returns (UserSummary) {}
+}
+```
+## server
+server端在client端发送完所有数据后，return 一个response。
+```go
+package main
+
+import (
+	"fmt"
+	"google.golang.org/grpc"
+	pb "grpc-demo/helloworld"
+	"io"
+	"net"
+)
+
+type Service struct {
+}
+
+func (s *Service) SendUser(stream pb.User_SendUserServer) error {
+	fmt.Println("receive a request in Server method SendUser()")
+	var count uint32 = 0
+	for {
+		user, err := stream.Recv()
+		if err == io.EOF {
+			fmt.Printf("server receive all users\n\n")
+			//返回用户统计数据
+			return stream.SendAndClose(&pb.UserSummary{
+				Description: "total user",
+				Total:       count,
+			})
+		}
+		if err != nil {
+			fmt.Println("server receive error: ", err)
+		}
+
+		fmt.Println("server receive user id ", user.GetUid())
+		count++
+	}
+}
+
+const bind = "127.0.0.1:9999"
+
+func main() {
+	lis, err := net.Listen("tcp", bind)
+	if err != nil {
+		fmt.Println("occurs error ", err)
+		return
+	}
+	srv := &Service{}
+	s := grpc.NewServer()
+	pb.RegisterUserServer(s, srv)
+	fmt.Println("get ready to run server")
+	if err = s.Serve(lis); err != nil {
+		fmt.Println("start server error, ", err)
+	}
+}
+```
+### client
+客户端建立连接后得到一个stream，利用stream发送三个数据，发送完毕后，得到一个response。
+```go
+package main
+
+import (
+	"log"
+
+	"fmt"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	pb "grpc-demo/helloworld"
+)
+
+const (
+	address = "127.0.0.1:9999"
+)
+
+func main() {
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewUserClient(conn)
+	//客户端得到一个stream
+	stream, err := c.SendUser(context.Background())
+	if err != nil {
+		fmt.Println("occurs error :", err)
+		return
+	}
+	//定义发送给Server端的数据
+	userDatas := []pb.UserRequest{
+		pb.UserRequest{Uid: 1},
+		pb.UserRequest{Uid: 2},
+		pb.UserRequest{Uid: 3},
+	}
+	//利用得到的stream发送数据
+	for _, v := range userDatas {
+		err := stream.Send(&v)
+		if err != nil {
+			fmt.Println("occurs error :", err)
+			return
+		}
+	}
+	//发送完毕
+	resp, err := stream.CloseAndRecv()
+	if err != nil {
+		fmt.Println("occurs error :", err)
+		return
+	}
+	fmt.Println("Response is:", resp)
+}
+```
+
 
 ## 参考
 [gotutorial](https://developers.google.com/protocol-buffers/docs/gotutorial)
@@ -203,3 +342,5 @@ func main() {
 [github.com/protobuf](https://github.com/golang/protobuf)
 
 [example](https://github.com/grpc/grpc-go/tree/master/examples/helloworld)
+
+[grpc学习](http://licyhust.com/golang/2017/09/13/grpc-introdution/)
