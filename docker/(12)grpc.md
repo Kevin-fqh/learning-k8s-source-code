@@ -42,7 +42,7 @@
 # export PATH=$PATH:$GOPATH/bin
 ```
 
-6. grpc安装，下载https://github.com/grpc/grpc-go源码，最新版。如果提示`undefined: grpc.SupportPackageIsVersion4`，就是grpc版本不对。
+6. grpc安装，下载https://github.com/grpc/grpc-go源码，最新版。如果提示 undefined: grpc.SupportPackageIsVersion4 ，就是grpc版本不对。
 
 7. 至此，安装成功，后面就可以利用protoc工具来自动生成客户端和服务器端的通用代码，方便我们建立客户端和服务器端的服务。如果中间出现啥版本问题，直接下最新版。。。。应该是ok的。
 ```shell
