@@ -162,7 +162,7 @@ containerd中也有一个具体的例子，见[containerd-bundle](https://github
 docker-runc spec
 ```
 runc spec 命令会自动生成一个config.json文件，可以自行设置。 
-如果不设置，直接start一个容器，那么效果就是`docker exec -it {containerID} sh`。
+如果不设置，直接start一个容器，那么效果就是`docker exec -it {containerID} sh`。 
 
 修改config.json中的process部分，以sleep命令启动一个容器
 ```json
@@ -211,6 +211,8 @@ runc list
 # now delete the container
 runc delete mycontainerid
 ```
+
+最后可以用systemd来管理一个runc容器，实现在其退出后自动重启。
 
 ## 参考
 [runc官网](https://github.com/opencontainers/runc/tree/v1.0.0-rc2)
