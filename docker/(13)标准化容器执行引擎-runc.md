@@ -14,6 +14,9 @@
 
 ## 版本说明
 runc version 1.0.0-rc2
+containerd version 0.2.4
+runc和containerd的版本也要匹配，否则在解析config.json的时候也容易出问题
+编译都使用go-1.8.4，好像低于1.8的容易出问题，比如grpc连接不上
 
 ## 容器的标准OCF
 容器标准化的目标：操作标准化、内容无关、基础设施无关。 runc是OCF的其中一个具体实现，下面从runc的角度来介绍OCF，这并不是OCF的全部标准
