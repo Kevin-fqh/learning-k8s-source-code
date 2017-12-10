@@ -13,9 +13,9 @@
 <!-- END MUNGE: GENERATED_TOC -->
 
 ## 版本说明
-* runc version 1.0.0-rc2
-* containerd version 0.2.4
-runc和containerd的版本也要匹配，否则在解析config.json的时候也容易出问题。
+runc version 1.0.0-rc2
+containerd version 0.2.4
+runc和containerd的版本也要匹配，否则在解析config.json的时候也容易出问题
 编译都使用go-1.8.4，好像低于1.8的容易出问题，比如grpc连接不上
 
 ## 容器的标准OCF
