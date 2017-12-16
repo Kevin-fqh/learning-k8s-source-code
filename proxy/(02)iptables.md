@@ -25,7 +25,7 @@ netfilter/iptables 组合提供封包过滤、封包重定向和NAT等功能。
 
 Chain： prerouting、forward、postrouting ＋ input、output
 
-一个报文只有符合一个Chain上所有的匹配Rule，才会被运行放行(执行相应动作)。
+一个报文只有符合一个Chain上所有的匹配Rule，才会被放行(执行相应动作)。
 
 ## Rule
 每个Chain中可能会存在Rule（0条或者多条），一个报文只有匹配一个Chain上面的Rule，才会执行相应的动作。
@@ -72,7 +72,7 @@ Table 有4个，优先顺序从高到低是按照：raw->managle->nat->filter
 
 有些Table是肯定不会包含某些Chain的规则。
 
-在实际使用过程中，一般是通过 Table 作为操作入口，对 Rule 进行定义。
+**在实际使用过程中，一般是通过 Table 作为操作入口** ，对 Rule 进行定义。
 
 用户可以自定义 Chain，在其中针对某个应用设计一些 Rule。 但自定义的Chain不能直接使用，需要通过系统默认Chain的调用才能生效(通过Rule 的动作)。
 
