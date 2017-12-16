@@ -47,7 +47,19 @@ Chain： prerouting、forward、postrouting ＋ input、output
 - DNAT，目的地址转换，目的网络地址转换
 - MASQUERADE，SANT的一种特殊形式，适用于动态的、临时会变的IP上
 - REDIRECT，在本机做端口映射
-- LOG，记录信息在/var/log/message，然后让吓一跳Rule继续处理该报文
+- LOG，记录信息在/var/log/message，然后让下一跳Rule继续处理该报文
+
+一个SNAT例子： 当公网宿主机接收到来自于172.1.0.0/24的报文时，把报文的源IP地址替换成公网宿主机的出口网卡eth1的ip。 从而实现在内网访问外网
+```shell
+# 在公网宿主机上设置下面路由规则
+iptables -t nat -A POSTROUTING -s 172.1.0.0/24 -o eth1 -j MASQUERADE
+```
+
+一个DNAT例子：当公网宿主机的80端口接收到tcp请求之后，转发到内网的地址 172.1.10.2:80 。从而实现内网的服务可以被外网访问
+```shell
+# 在公网宿主机上设置下面路由规则
+iptables -t -nat -A PREROUTING -p tcp -m tcp --dport 80 -j DNAT --to-destination 172.1.10.2:80
+```
 
 ## Table
 把具有相同功能的Rule放到一起，称之为一个Table。 都需要相应内核模块的支持。
