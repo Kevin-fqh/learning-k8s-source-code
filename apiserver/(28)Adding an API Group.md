@@ -11,11 +11,11 @@
     - 新建`pkg/apis/<group>/<version>/type.go`
 	
 2. 在registry.go中把本Group 的API Object注册到Scheme中，可以参考`pkg/apis/authentication/register.go 和 pkg/apis/authentication/v1beta1/register.go`。 registry文件必须有一个名为SchemeBuilder的变量，以供自动生成的代码引用。 必须有一个AddToScheme方法供安装程序引用。 可以参考pkg/apis/...下Group的register.go文件，但不要直接复制粘贴，它们不是通用的。
-    - pkg/apis/<group>/register.go
-    - pkg/apis/<group>/<version>/register.go 
+    - `pkg/apis/<group>/register.go`
+    - `pkg/apis/<group>/<version>/register.go`
 
 3. 新建install.go,可能仅仅需要更改pkg/apis/authentication/install.go中的Group Name和Version。 这个package必须要在k8s.io/kubernetes/pkg/api/install中被导入。
-    - pkg/apis/<group>/install/install.go
+    - `pkg/apis/<group>/install/install.go`
 	
 第2步和第3步是机械的，我们计划使用`cmd/libs/go2idl/`下的工具来自动生成。
 
