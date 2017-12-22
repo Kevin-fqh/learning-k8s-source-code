@@ -72,7 +72,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/install"
 	...
 	...
-	_ "k8s.io/kubernetes/pkg/apis/storage/install"
+	_ "k8s.io/kubernetes/pkg/apis/premierleague/install"
 )
 ```
 好了，至此Apiserver端的代码已经完成了。
