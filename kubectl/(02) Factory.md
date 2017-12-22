@@ -60,10 +60,13 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 
 ### import文件引入的init函数
 NewClientCache 定义在/pkg/kubectl/cmd/util/clientcache.go，
-会有类似于apiserver 资源注册的init函数执行，
+会有类似于apiserver 资源注册的init函数执行
+```go
+/pkg/client/clientset_generated/internalclientset/import_known_versions.go
+```
+
 NewOrDie，创建了一个默认的APIRegistrationManager。
 ```go
-"k8s.io/kubernetes/pkg/api/unversioned"
 "k8s.io/kubernetes/pkg/apimachinery/registered"
 ```
 

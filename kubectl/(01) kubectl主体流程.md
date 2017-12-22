@@ -222,10 +222,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		
 	/*
 		根据cmd来获取输出的printer
-		generic的值和具体格式有关，一般情况下generic＝true
 		==>定义在/pkg/kubectl/cmd/util/printing.go
 			==>func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error)
-		这里的printer会在generic＝true的时候使用
+		不指定格式时，generic=false
 	*/
 	printer, generic, err := cmdutil.PrinterForCommand(cmd)
 	
@@ -277,7 +276,13 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		下面的for循环就是正常的源码编译出来的kubectl get 一个资源输出的信息
 	*/
 	for ix := range objs{
-		
+		...
+		if printer != nil {
+				w.Flush()
+				//不指定格式 或者 kubect -o wide 的时候走此处
+				cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, filterOpts)
+			}
+		...
 	}
 ```
 ### func (f *factory) UnstructuredObject()
