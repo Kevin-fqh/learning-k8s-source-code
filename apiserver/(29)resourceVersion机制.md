@@ -16,7 +16,7 @@ resourceVersion的值是怎么来的？ 我们从`kubectl create`命令开始研
 
 ### etcdhelper
 可以知道`kubectl create`会调用etcdhelp的Create()，见/pkg/storage/etcd/etcd_helper.go，其流程分析如下：
-1. 根据用户传入的信息调用etcdClient的Set()在etcd中创建对象，并得到返回信息response
+1. 根据用户传入的信息调用etcdClient的Set()在etcd中创建对象，并得到返回信息response。 具体用法参考[etcdClient](https://github.com/coreos/etcd/tree/master/client)
 2. response中信息会包含etcd数据库此时最新的index，此值就是该obj的resourceversion
 3. 把response中信息解析绑定到obj中
 
