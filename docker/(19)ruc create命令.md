@@ -527,7 +527,7 @@ func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, parentPipe, c
 	}
 	_, sharePidns := nsMaps[configs.NEWPID]
 	/*
-		设置Namespaces.CloneFlags()
+		设置Namespaces.CloneFlags()，6个Namespace标识
 		将namespace、uid/gid mapping等信息使用 bootstrapData 函数封装为一个 io.Reader，使用的是 netlink 用于内核间的通信
 	*/
 	data, err := c.bootstrapData(c.config.Namespaces.CloneFlags(), nsMaps, "")

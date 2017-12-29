@@ -21,7 +21,7 @@
 create命令完成的工作：
 1. 在hots主机上根据用户指定的配置生成一个container的工作目录，/var/lib/docker/containers/{id}，同时把配置属性给持久化下来。
 2. 然后向daemon注册该container，注册之后，daemon就可以通过<container.ID>来使用该容器。
-3. 并没后把该容器run起来！
+3. 并没后把该容器run起来！不涉及到底层`containerd`等工具的调用。
 
 ## postContainersCreate
 这是docker daemon响应docker client端命令的handler method。 
