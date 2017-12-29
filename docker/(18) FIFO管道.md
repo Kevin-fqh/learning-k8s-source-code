@@ -16,7 +16,7 @@ FIFO管道就像一个公共通道，能把两个不相关的进程联系起来�
 tmp_fifo="/home/fifo/test.fifo"
 rm -f $tmp_fifo
 mkfifo $tmp_fifo
-exec 6>$tmp_fifo   #以写方式打开管道，此时必须有进程以读的方式打开该FIFO，本进程才能继续运行，否则会一直阻塞在这里
+exec 6>$tmp_fifo   #以'写'方式打开管道，此时必须有进程以读的方式打开该FIFO，本进程才能继续运行，否则会一直阻塞在这里
 #exec 6<>$tmp_fifo #这句话能把管道变成非阻塞！ 读写管道
 
 i=0
@@ -50,6 +50,12 @@ do
         echo "$TEXT"          #每1s就读取一个数据，并且打印到终端，要停止，最好挂起进程！
 done <&6
 ```
+
+## 调用
+1. 第一步，client端以“只写”方式打开fifo管道，运行`sh client.sh`，此时会发生阻塞
+2. 第二步，server端以"只读"方式或者“读写”方式打开fifo管道，会发现前面的client端开始写入数据了。然后，server端就可以读取数据。
+3. server端会一直把管道中数据全部读完，即使中间client端进程被挂起
+4. 如果在第一步中，client端是以“读写”方式打开管道，那么不会发生阻塞，直接就能够写入数据。
 
 ## runc中的应用
 runc中的create和start命令就是通过FIFO的使用来实现阻塞，见/runc-1.0.0-rc2/libcontainer/standard_init_linux.go
