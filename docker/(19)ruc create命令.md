@@ -57,7 +57,7 @@ runc start
 1. 生成一个libcontainer.Container，状态处于 stopped/destroyed
 2. 然后把libcontainer.Container封装到type runner struct对象中
 3. 通过runner.run来把容器中进程给跑起来
-```
+```go
 func startContainer(context *cli.Context, spec *specs.Spec, create bool) (int, error) {
 	id := context.Args().First()
 	if id == "" {

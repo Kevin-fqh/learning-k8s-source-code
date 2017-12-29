@@ -120,7 +120,7 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 
 ### newContainerInit
 `runc create {}` 时的t类型是  initStandard
-```
+```go
 func newContainerInit(t initType, pipe *os.File, stateDirFD int) (initer, error) {
 	var config *initConfig
 	/*
@@ -158,7 +158,7 @@ func newContainerInit(t initType, pipe *os.File, stateDirFD int) (initer, error)
 
 ## type linuxStandardInit struct
 - 定义
-```
+```go
 type linuxStandardInit struct {
 	pipe       io.ReadWriteCloser
 	parentPid  int
