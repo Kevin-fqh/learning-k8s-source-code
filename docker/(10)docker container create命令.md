@@ -493,7 +493,7 @@ type mountedLayer struct {
 2. 选择从另一个容器装入的卷。 覆盖以前配置的MountPoints。
 3. 选择client端设置的 bind mounts。 覆盖以前配置的MountPoints。
 4. 清理即将被重新分配的旧volumes。
-```
+```go
 // registerMountPoints initializes the container mount points with the configured volumes and bind mounts.
 // It follows the next sequence to decide what to mount in each final destination:
 //
