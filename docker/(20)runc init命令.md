@@ -172,8 +172,8 @@ type linuxStandardInit struct {
 1. 前面部分主要是进行参数设置和状态检查等
 2. `exec.LookPath(l.config.Args[0])`在当前系统的PATH中寻找 cmd 的绝对路径。这个cmd就是config.json中声明的用户希望执行的初始化命令。
 3. 以"只写" 方式打开fifo管道，形成阻塞。等待另一端有进程以“读”的方式打开管道。
-4. 其实到这里，`runc create`命令的作用已经结束了。 后面将是等待`runc start` 
-5. 阻塞清除后，根据config配置初始化seccomp，并调用syscall.Exec执行cmd。 系统调用syscall.Exec()，执行用户真正希望执行的命令，用来覆盖掉PID为1的Init进程
+4. 如果单独执行`runc create`命令，到这里就会发生阻塞。 后面将是等待`runc start`以只读的方式打开FIFO管道，阻塞才会消除 ，本进程（Init进程）才会继续后面的流程。
+5. 阻塞清除后，`Init进程`会根据config配置初始化seccomp，并调用syscall.Exec执行cmd。 系统调用syscall.Exec()，执行用户真正希望执行的命令，用来覆盖掉PID为1的Init进程。 至此，在容器内部PID为1的进程才是用户希望一直在前台执行的进程
 
 ```go
 func (l *linuxStandardInit) Init() error {
@@ -226,6 +226,10 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 	}
+	/*
+		配置hostname、apparmor、processLabel、sysctl、readonlyPath、maskPath。
+		这些对容器启动本身没有太多影响
+	*/
 	if hostname := l.config.Config.Hostname; hostname != "" {
 		if err := syscall.Sethostname([]byte(hostname)); err != nil {
 			return err
@@ -333,6 +337,8 @@ func (l *linuxStandardInit) Init() error {
 		了解FIFO管道
 		==> http://blog.csdn.net/firefoxbug/article/details/8137762
 		==> http://blog.csdn.net/firefoxbug/article/details/7358715
+
+		func Openat(dirfd int, path string, flags int, mode uint32) (fd int, err error)
 	*/
 	fd, err := syscall.Openat(l.stateDirFD, execFifoFilename, os.O_WRONLY|syscall.O_CLOEXEC, 0)
 	if err != nil {
@@ -343,8 +349,11 @@ func (l *linuxStandardInit) Init() error {
 		*********runc create 与 runc start 的分割线**************
 		********************************************************
 		从这里开始，实际上是`runc start`的时候才会触发的操作了。
-		阻塞清除后，根据config配置初始化seccomp，
+		阻塞清除后，`runc Init进程`会根据config配置初始化seccomp，
 		并调用syscall.Exec执行config里面指定的命令
+
+		如果单独执行`runc create`命令，在这里就会发生了阻塞。
+		后面将是等待`runc start`以只读的方式打开FIFO管道，阻塞才会消除 ，本进程（Init进程）才会继续后面的流程。
 	*/
 	if _, err := syscall.Write(fd, []byte("0")); err != nil {
 		return newSystemErrorWithCause(err, "write 0 exec fifo")
@@ -356,9 +365,11 @@ func (l *linuxStandardInit) Init() error {
 		}
 	}
 	/*
-		 **********
+		************
 		系统调用syscall.Exec()，执行用户真正希望执行的命令
 		用来覆盖掉PID为1的Init进程
+		至此，在容器内部PID为1的进程才是用户希望一直在前台执行的进程
+		ps -ef 看到PID为1
 	*/
 	if err := syscall.Exec(name, l.config.Args[0:], os.Environ()); err != nil {
 		return newSystemErrorWithCause(err, "exec user process")
@@ -366,4 +377,3 @@ func (l *linuxStandardInit) Init() error {
 	return nil
 }
 ```
-

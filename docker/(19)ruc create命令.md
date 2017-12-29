@@ -26,6 +26,13 @@ runc start
 ## createCommand
 见/runc-1.0.0-rc2/create.go
 ```go
+var createCommand = cli.Command{
+	Name:  "create",
+	Usage: "create a container",
+	ArgsUsage: `<container-id>
+	...
+	...
+	...
 	/*
 		声明了`runc create`子命令的动作Action
 	*/
@@ -51,6 +58,7 @@ runc start
 		os.Exit(status)
 		return nil
 	},
+}
 ```
 
 ### startContainer
@@ -210,7 +218,7 @@ func loadFactory(context *cli.Context) (libcontainer.Factory, error) {
 ### LinuxFactory.Create
 1. 生成一个/run/runc/{containerID}/exec.fifo，管道
 2. 创建一个linuxContainer对象，状态处于 stopped
-```
+```go
 func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, error) {
 	if l.Root == "" {
 		return nil, newGenericError(fmt.Errorf("invalid root"), ConfigInvalid)
@@ -385,6 +393,7 @@ func (r *runner) run(config *specs.Process) (int, error) {
 
 1. linuxContainer.newParentProcess组装将要执行的命令parent
 2. parent.start()会根据parent的类型来选择对应的start()，自此之后，将进入`/proc/self/exe init`，也就是`runc init`
+3. 容器的状态是 created
 ```go
 func (c *linuxContainer) Start(process *Process) error {
 	c.m.Lock()
