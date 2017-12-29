@@ -6,7 +6,7 @@
   - [factory.StartInitialization](#factorystartinitialization)
     - [newContainerInit](#newcontainerinit)
   - [type linuxStandardInit struct](#type-linuxstandardinit-struct)
-    - [linuxStandardInit.Init](#linuxstandardinit.init)
+    - [linuxStandardInit.Init](#linuxstandardinitinit)
 <!-- END MUNGE: GENERATED_TOC -->
 
 在`runc create`中会clone出一个子进程，在子进程中调用`/proc/self/exe init`，也就是`runc init`。
