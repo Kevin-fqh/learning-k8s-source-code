@@ -79,7 +79,7 @@ func StorageWithCacher(
 	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
 	// Currently it has two layers of same storage interface -- cacher and low level kv.
 	/**TODO：目标是让storage一直拥有cacher**/
-	/**目前拥有两个级别的的storage interface -- cacher和低级别的kv **/
+	/**目前拥有两个级别的的storage interface -- cacher和底层的kv **/
 	/*
 		CacherConfig的初始化
 		==>定义在/pkg/storage/cacher.go
@@ -137,7 +137,7 @@ func NewRawStorage符合创建和etcd的连接，把storage和关闭连接的Des
 // NewRawStorage creates the low level kv storage. This is a work-around for current
 // two layer of same storage interface.
 /*
-	译：NewRawStorage创建低级别的kv存储。 这是一个解决当前两层相同存储接口的解决方案。
+	译：NewRawStorage创建底层的kv存储。 这是一个解决当前两层相同存储接口的解决方案。
 */
 // TODO: Once cacher is enabled on all registries (event registry is special), we will remove this method.
 func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc) {
