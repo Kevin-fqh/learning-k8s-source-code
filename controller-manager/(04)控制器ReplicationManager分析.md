@@ -361,7 +361,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 3. 如果差值diff为负数，表示当前Active状态的Pods数量不足
   - 比较|diff|和burstReplicas的值，以保证这次最多只创建burstReplicas数量的pods。
   - 调用expectations.ExpectCreations接口, 设置expectations中的add大小为|diff|的值，表示要新创建|diff|数量的pods以达到期望状态。
-  - sync.WaitGroup启动|diff|数量的goroutine协程，每个goroutine分别负责调用podControl.CreatePods接口, 创建一个该namespace.rc管理的对应spec Template的pod。
+  - sync.WaitGroup启动|diff|数量的goroutine协程，每个goroutine分别负责调用podControl.CreatePodsWithControllerRef接口, 创建一个该namespace.rc管理的对应spec Template的pod。
   - 待所有goroutine都执行完毕后，如果其中一个或者多个pod创建失败，则返回err，否则返回nil，流程结束。
 
 4. 如果差值diff为正数，表示当前Active状态的Pods数量超过了期望值
@@ -417,13 +417,14 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		glog.V(2).Infof("Too few %q/%q replicas, need %d, creating %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
 		/*
 			sync.WaitGroup启动|diff|数量的goroutine协程，
-			每个goroutine分别负责调用podControl.CreatePods接口, 创建一个该namespace.rc管理的对应spec Template的pod。
+			每个goroutine分别负责调用podControl.CreatePodsWithControllerRef接口, 创建一个该namespace.rc管理的对应spec Template的pod。
 		*/
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wg.Done()
 				var err error
 				if rm.garbageCollectorEnabled {
+					// 默认情况rm.garbageCollectorEnabled＝true
 					var trueVar = true
 					controllerRef := &api.OwnerReference{
 						APIVersion: getRCKind().GroupVersion().String(),
@@ -432,6 +433,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 						UID:        rc.UID,
 						Controller: &trueVar,
 					}
+					//在etcd中写入pod的数据
 					err = rm.podControl.CreatePodsWithControllerRef(rc.Namespace, rc.Spec.Template, rc, controllerRef)
 				} else {
 					err = rm.podControl.CreatePods(rc.Namespace, rc.Spec.Template, rc)
