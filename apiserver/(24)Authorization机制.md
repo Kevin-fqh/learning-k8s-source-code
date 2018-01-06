@@ -3,7 +3,7 @@
 **Table of Contents**
 <!-- BEGIN MUNGE: GENERATED_TOC -->
   - [Overview](#overview)
-  - [初始化加载Authenticator Plugin](#初始化加载authenticator-plugin)
+  - [初始化加载Authorization Plugin](#初始化加载authorization-plugin)
   - [type unionAuthzHandler](#type-unionauthzhandler)
   - [MODEL ABAC](#model-abac)
   - [MODEL RBAC](#model-rbac)
@@ -86,8 +86,8 @@ K8s授权机制仅处理以下的请求属性:
 * API Group
 
 
-## 初始化加载Authenticator Plugin
-Authenticator部分和Authentication部分是很类似的，还是见/cmd/kube-apiserver/app/server.go的Run()
+## 初始化加载Authorization Plugin
+Authorization部分和Authentication部分是很类似的，还是见/cmd/kube-apiserver/app/server.go的Run()
 ```go
 	/*
 		授权，Authenticator机制
