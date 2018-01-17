@@ -448,7 +448,7 @@ func (s *apiServer) CreateContainer(ctx context.Context, c *types.CreateContaine
 可以看到这里接收到一个Request之后，会把其转化为一个type startTask struct，经`s.sv.SendTask(e)`发送给supervisors的main event loop，然后等待supervisors的处理结果，等到之后再Resonese给docker-daemon端。
 
 ## type Supervisor struct
-type Supervisor struct是containerd的核心部件。Supervisor是以把一个Request转化为一个Task来进行管理，为一个Task调用`containerd-shim`，从而启动容器。 理清其数据通道，是了解containerd的关键。
+type Supervisor struct是containerd的核心部件。Supervisor是把一个Request转化为一个Task来进行管理，为一个Task调用`containerd-shim`，从而启动容器。 理清其数据通道，是了解containerd的关键。
 
 两个核心属性：
   * startTasks  chan *startTask ,这是containerd到runc的桥梁，由func (w *worker) Start()消费

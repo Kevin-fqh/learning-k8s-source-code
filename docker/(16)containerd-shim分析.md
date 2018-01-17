@@ -7,9 +7,9 @@ containerd中调用shim时执行的命令如下：
 /root/lib-containerd/containerd/bin/containerd-shim {containerID} {bundleDirPath} runc
 ```
 其中三个参数如下：
-    * Arg0: id of the container
-    * Arg1: bundle path
-    * Arg2: runtime binary
+  - Arg0: id of the container
+  - Arg1: bundle path
+  - Arg2: runtime binary
 
 ## func main()
 ```go

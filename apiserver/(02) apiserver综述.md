@@ -14,8 +14,8 @@
 - APIGroupInfo：是在同一个Group下的所有资源的集合。
 
 ## 资源版本
-一个资源对应着两个版本: 一个版本是用户访问的接口对象（yaml或者json通过接口传递的格式），称之为internal version;
-另一个版本则是核心对象，实现了资源创建和删除等，并且直接参与持久化，对应了在etcd中存储，称之为external version。
+一个资源对应着两个版本: 一个版本是用户访问的接口对象（yaml或者json通过接口传递的格式），称之为external version;
+另一个版本则是核心对象，实现了资源创建和删除等，并且直接参与持久化，对应了在etcd中存储，称之为internal version。
 这两个版本的资源是需要相互转化的，并且转换方法需要事先注册在Scheme中。
 
 版本化的API旨在保持稳定，而internal version是为了最好地反映Kubernetes代码本身的需要。
@@ -29,11 +29,6 @@ etcd中存储的是带版本的，这也是Apiserver实现多版本转换的核�
 对于core Group而言，internal version的对象定义在`/kubernetes-1.5.2/pkg/api/types.go`。  
 v1是其中一个external version，其对象定义在`/kubernetes-1.5.2/pkg/api/v1/types.go`。  
 一个对象在internal version和external version中的定义可以一样，也可以不一样。
-
-资源的核心对象是该类型资源的主体，参与操作资源的相关方法和持久化。
-这句话怎么理解呢？
-也就是说，如果一个Struct A如果在internal version中仅定义属性a；同时在一个external version中定义了属性a和b。
-那么，当Struct A的对象持久化存储到etcd中时，仅有a属性会被存储下来，属性b并不会被保存下来。
 
 ## Apiserver启动时初始化流程
 1. initial.go中的初始化主要用internal version和external versions填充了Scheme，完成了 APIRegistrationManager中GroupMeta的初始化。GroupMeta的主要用于后面的初始化APIGroupVersion。

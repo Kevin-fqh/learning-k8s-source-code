@@ -102,7 +102,9 @@ root@fqhnode:~# readlink /proc/16154/exe
 
 ## Namespace的系统调用
 clone： 创建一个新的进程并把他放到新的namespace中
+
 sents： 将当前进程加入到已有的namespace中
+
 unshare: 使当前进程退出指定类型的namespace，并加入到新创建的namespace（相当于创建并加入新的namespace）
 
 ## 参考

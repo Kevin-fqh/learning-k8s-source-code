@@ -605,6 +605,11 @@ func newProcess(config *processConfig) (*process, error) {
 	}
 	/*
 		根据ExitFile文件路径创建Mkfifo管道对象，并以O_NONBLOCK,O_RDONLY模式打开管道OpenFile等待写入的数据并读取。
+		非阻塞的打开方式
+
+		和/containerd-0.2.3/containerd-shim/main.go中的以O_WRONLY方式打开exit管道对应
+			==>func start(log *os.File) error
+				==>f, err := os.OpenFile("exit", syscall.O_WRONLY, 0)
 	*/
 	exit, err := getExitPipe(filepath.Join(config.root, ExitFile))
 	if err != nil {
@@ -617,6 +622,10 @@ func newProcess(config *processConfig) (*process, error) {
 	if err != nil {
 		return nil, err
 	}
+	/*
+		把fifo管道exit赋给p.exitPipe
+		后面由monitor的epoll机制来读取该管道
+	*/
 	p.exitPipe = exit
 	p.controlPipe = control
 	return p, nil

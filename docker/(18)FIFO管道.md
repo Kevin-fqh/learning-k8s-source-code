@@ -201,8 +201,9 @@ func (l *linuxStandardInit) Init() error {
 	/*
 		与父进程之间的同步已经完成，关闭pipe，pipe是一个匿名管道（类似于go中的有容量的channel）
 		匿名管道应用的一个重大限制是它没有名字，因此，只能用于具有亲缘关系的进程间通信。
-		能把两个不相关的进程联系起来，FIFO就像一个公共通道，解决了不同进程之间的“代沟”。
 		普通的无名管道只能让相关的进程进行沟通(比如父shell和子shell之间)
+		
+		而，FIFO就像一个公共通道，能把两个不相关的进程联系起来，解决了不同进程之间的“代沟”。
 	*/
 	l.pipe.Close()
 	// wait for the fifo to be opened on the other side before
