@@ -25,6 +25,7 @@ shell是什么？ shell是一个管理进程和运行程序的程序，主要有
 2. shell建立一个新的进程来运行这个程序
 3. shell将程序从磁盘中载入
 4. 程序在它的进程中运行直到结束
+
 ![一个shell的主循环](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/一个shell的主循环.png)
 
 写成伪代码，如下：
@@ -124,6 +125,7 @@ shell对于内核来说也是一个进程。
 5. 从此之后，就有了两个一样的进程，而且都运行到相同的地方，然后各自开展自己独立的生命旅程。
 
 fork出来的子进程不是从头开始运行的，而是从fork()返回的地方开始其生命旅程。
+
 ![系统调用fork](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/系统调用fork.png)
 
 ```c
@@ -155,6 +157,7 @@ wait()的返回值是`子进程的pid`，而其入参`&status`的定义是`int�
 4. 父进程调用wait()，内核会挂起父进程，直到子进程结束。也就是说这个时候父进程发生了阻塞。
 5. 子进程任务结束时会调用exit(n)，n会复制给wait()的入参status
 6. 此时内核唤醒父进程，父进程根据wait()的返回值来判断哪一个子进程结束了。
+
 ![系统调用wait](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/系统调用wait.png)
 
 ### 小结
@@ -162,6 +165,7 @@ wait()的返回值是`子进程的pid`，而其入参`&status`的定义是`int�
 
 shell用fork()创建一个新的进程，用exec()在新的进程中运行用户指定的程序，最后shell用wait()等待新进程的结束。 
 wait()同时从内核中获取子进程的退出状态。
+
 ![shell模型](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/shell模型.png)
 
 ![shell模型简化版](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/shell模型简化版.png)
@@ -214,10 +218,16 @@ shell支持特殊的变量来表示系统设置，比如变量`$$`表示shell的
 每个程序都会从调用它的进程中继承一个环境变量，环境变量用来保存回话(session)的全局设置和某个程序的参数设置。
 
 环境变量是每一个程序都可以存取的一个字符串数组。数组的地址被存放在一个名为environ的全局变量中。
+
 ![环境变量的存储](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/环境变量的存储.png)
 
-前面说到`exec`系统调用会把当前进程的所有数据全部清除，换成新的程序。但是`environ`指针指向的环境变量数据是唯一的例外。 
+前面说到`exec`系统调用会把当前进程的所有数据全部清除，换成新的程序。但是`environ`指针指向的环境变量数据是个例外。 
 当内核执行系统调用execve时，它会从调用者那里复制一份`environ`指向的数据。
+
+系统调用`exec`替换进程中运行的程序，但它不会改变进程的属性、和进程中所有的连接。 
+故文件描述符fd(复制了一个连接)、进程的用户ID、进程的优先级都不会被`exec`改变。 
+其中文件描述符fd是`进程的一个属性`，并不是属于程序的。
+
 ![exec复制环境变量](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/exec复制环境变量.png)
 
 还需要注意的是，子进程中环境变量是父进程env的一个副本，子进程不能修改父进程的env。 这是因为fork和exec的时候，env是会被自动复制的。

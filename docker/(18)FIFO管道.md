@@ -2,7 +2,7 @@
 
 runc中用到了匿名管道pipe和有名管道FIFO来进行通信和流程控制。 
 
-pipe是一个匿名管道（类似于go中的有容量的channel），匿名管道应用的一个重大限制是它没有名字，因此，只能用于具有亲缘关系的进程间通信。Go语言中通过os.Pipe()来创建。
+pipe是一个匿名管道，匿名管道应用的一个重大限制是它没有名字，因此，只能用于具有亲缘关系的进程间通信。Go语言中通过os.Pipe()来创建。
 
 FIFO管道就像一个公共通道，能把两个不相关的进程联系起来。 本文通过一个例子看来看看FIFO的使用。
 
@@ -199,7 +199,7 @@ func (l *linuxStandardInit) Init() error {
 	}
 	// close the pipe to signal that we have completed our init.
 	/*
-		与父进程之间的同步已经完成，关闭pipe，pipe是一个匿名管道（类似于go中的有容量的channel）
+		与父进程之间的同步已经完成，关闭pipe，pipe是一个匿名管道
 		匿名管道应用的一个重大限制是它没有名字，因此，只能用于具有亲缘关系的进程间通信。
 		普通的无名管道只能让相关的进程进行沟通(比如父shell和子shell之间)
 		
