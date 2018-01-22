@@ -53,7 +53,11 @@ var createCommand = cli.Command{
 		// exit with the container's exit status so any external supervisor is
 		// notified of the exit with the correct exit status.
 		/*
-			该容器所有的external supervisor都会被通知到，该容器已经exit
+			父进程(runc create进程本身)exit了
+			用户期待在容器内运行的进程还活着
+			子进程会被container-shim接管？
+			这是为什么呢？默认情况下，应该是被pid=1的系统Init进程接管才对？
+			这是因为通过系统调用设置了container-shim进程的"child subreaper"属性
 		*/
 		os.Exit(status)
 		return nil

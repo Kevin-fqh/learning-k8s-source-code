@@ -69,6 +69,12 @@ func start(log *os.File) error {
 	// set the shim as the subreaper for all orphaned processes created by the container
 	/*
 		把shim作为所有由容器创建的孤儿进程的回收者
+			==>通过系统调用设置了container-shim进程的"child subreaper"属性，
+				==>/containerd-0.2.3/osutils/prctl.go
+					==>func SetSubreaper(i int) error
+		入参为 1
+			==>表示本进程是 下面所有子进程(孙子进程...)的 pid=1的Init进程
+				充当孤儿进程挂靠pid=1的Init进程的效果
 	*/
 	if err := osutils.SetSubreaper(1); err != nil {
 		return err

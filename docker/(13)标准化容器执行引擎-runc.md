@@ -43,7 +43,7 @@ runc和containerd的版本也要匹配，否则在解析config.json的时候也�
 		"arch": "amd64"
 	},
 	"process": {
-		"terminal": false,
+		"terminal": false, //false表示以后台模式运行
 		"user": {
 			"uid": 0,  //都是0，表示进入容器后是root用户
 			"gid": 0

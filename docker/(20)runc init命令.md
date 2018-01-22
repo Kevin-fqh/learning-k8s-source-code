@@ -329,6 +329,11 @@ func (l *linuxStandardInit) Init() error {
 	// exec'ing the users process.
 	/*
 		"只写" 方式打开fifo管道并写入0，会一直保持阻塞，
+
+		会通知parent进程（即runc create进程）退出。
+		child进程（即容器中进程）会被container-shim接管；==>？？为什么？？
+		如果直接runc拉起的，会被pid=1进程接管
+
 		直到管道的另一端以读方式打开，并读取内容
 		*************************
 		至此，create操作流程已经结束
