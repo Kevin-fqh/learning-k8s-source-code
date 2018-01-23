@@ -25,7 +25,7 @@ func getHandler(w http.ResponseWriter, req *http.Request) {
 		Price: 13.1,
 	}
 	
-	//解析成json格式
+	//解析成json格式，对数据b1进行编码，写入 w http.ResponseWriter
 	encoder := json.NewEncoder(w)
 	// 间隔3s给client端发送一个信息
 	for i := 0; i < 10; i++ {
@@ -74,6 +74,7 @@ func main() {
 	}
 	var v map[string]interface{}
 
+	//从resp.Body中读取数据，解码成&v
 	decoder := json.NewDecoder(resp.Body)
 	// 在server端全部发送完消息后，会进行break
 	for {
