@@ -24,6 +24,17 @@ flannel-0.7.1
 
 ```
 
+flannel可以为容器提供网络服务。 
+其模型为全部的容器使用一个network，然后在每个host上从network中划分一个子网subnet。 
+为host上的容器创建网络时，从subnet中划分一个ip给容器。
+
+其采用目前比较流行的no server的方式，即不存在所谓的控制节点，而是每个host上的flanneld从一个etcd中获取相关数据，然后声明自己的子网网段，并记录在etcd中。
+
+其他的host对数据转发时，从etcd中查询到该子网所在的host的ip，然后将数据发往对应host上的flanneld，交由其进行转发。
+
+根据kubernetes的模型，即为每个pod提供一个ip。
+flannel的模型正好与之契合。
+
 ## 三大核心概念
 - network 负责网络的管理（以后的方向是多网络模型，一个主机上同时存在多种网络模式），根据每个网络的配置调用 subnet;
 - subnet 负责和 etcd 交互，把 etcd 中的信息转换为 flannel 的子网数据结构，并对 etcd 进行子网和网络的监听;
@@ -763,4 +774,7 @@ type Network interface {
 # docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} >> /var/log/docker.log 2>&1 &
 ```
 ![iptables](https://github.com/Kevin-fqh/learning-k8s-source-code/blob/master/images/flannel-3.png)
+
+## 参考
+[浅析flannel与docker结合的机制和原理](https://xuxinkun.github.io/2016/07/18/flannel-docker/)
 
