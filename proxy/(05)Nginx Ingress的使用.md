@@ -253,9 +253,18 @@ spec:
 ```
 对应的访问方式是`curl fqhnode/myetcd/v2/members`
 
-最后要说的是，如果需要在k8s集群外部访问的话，只需要在外部的客户端主机上`/etc/hosts`添加一个域名`192.168.56.101 fqhnode`即可
+最后要说的是，如果需要在k8s集群外部访问的话，只需要在外部的客户端主机上`/etc/hosts`添加一个域名`192.168.56.101 fqhnode`即可。
+
+通常可以使用对外使用多个域名，但后面用的都是同一个IP。
+```
+foo.bar.com --|                 |-> foo.bar.com s1:80
+              | 178.91.123.132  |
+bar.foo.com --|                 |-> bar.foo.com s2:80
+```
 
 ## 参考
+[Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/#)
+
 [官方ingress模板](https://github.com/kubernetes/kubernetes/tree/8d3a19229fe97b4dcee9167ca4538466f7720314/test/e2e/testing-manifests/ingress/http)
 
 [Kubernetes Nginx Ingress 教程](https://mritd.me/2017/03/04/how-to-use-nginx-ingress/)
