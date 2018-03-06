@@ -683,24 +683,25 @@ spec:
               memory: 256Mi
             requests:
               cpu: 200m
-			  memory: 256Mi
+              memory: 256Mi
           volumeMounts:
-		   - name: registry
-		     mountPath: /var/lib/registry
+            - name: registry
+              mountPath: /var/lib/registry
           livenessProbe:
-		    httpGet:
-			  path: /image/list
-			  port: 8080
-			  initialDelaySeconds: 60
-			  timeoutSeconds: 10
+            httpGet:
+              path: /image/list
+              port: 8080
+              initialDelaySeconds: 60
+              timeoutSeconds: 10
       volumes:
-	    - name: registry
-		  persistentVolumeClaim:
-		    claimName: regsitry
+        - name: registry
+          persistentVolumeClaim:
+            claimName: regsitry
 ```
 
 ## 总结
 两种存储卷：普通Volume 和Persistent Volume。
+
 普通Volume在定义Pod的时候直接定义，Persistent Volume通过Persistent Volume Claim来动态绑定。
 PV可以手动创建,也可以通过StorageClass来动态创建。
 
