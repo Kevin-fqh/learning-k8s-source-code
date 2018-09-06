@@ -374,6 +374,9 @@ func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uin
 			return
 		}
 		// only send events newer than resourceVersion
+		/*
+			结合etcd和Cacher的resourceVersion进行对比，形成一个WatchEvent，分发到各个观察者watcher中
+		*/
 		if event.ResourceVersion > resourceVersion {
 			c.sendWatchCacheEvent(&event)
 		}

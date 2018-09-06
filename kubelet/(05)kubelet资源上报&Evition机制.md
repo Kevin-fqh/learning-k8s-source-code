@@ -26,7 +26,9 @@ kubelet
     * kubelet 间隔`--node-status-update-frequency duration`向apiserver上报node status信息
 	
     * kube-controller-manager 间隔`node-monitor-grace-period`时间之后，把node状态设置为NotReady
+	
     * kube-controller-manager 在第一次kubelet notReady事件之后的`pod-eviction-timeout duration`时间后，开始驱逐pod。并不是CM把node状态设置为notready之后再等待`pod-eviction-timeout duration`时间
+	
     * kube-controller-manager 间隔`node-monitor-period`时间后从apiserver同步node status信息
 	
 其中kubelet的上报时间不宜过短，因为收集完整的node信息需要一定的时间。

@@ -228,7 +228,7 @@ func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
 至此，Event的定义和生产过程都已经说清楚了。我们可以认为拥有EventsRecorder成员的k8s资源都可以产生Events，
 如，负责管理注册、注销等NodeController，会将Node的状态变化信息记录为Events。
 DeploymentController会记录回滚、扩容等的Events。他们都在ControllerManager启动时被初始化并运行。
-与此同时Kubelet除了会记录它本身运行时的Events，比如：无法为Pod挂载卷等，还包含了一系列像docker_manager这样的小单元，它们各司其职，并记录相Events。
+与此同时Kubelet除了会记录它本身运行时的Events，比如：无法为Pod挂载卷等，还包含了一系列像docker_manager这样的小单元，它们各司其职，并记录相应的Events。
 
 ## EventBroadcaster和Broadcaster
 在上面提到了EventBroadcaster有四种方式输出日志。分别是 处理函数handler、EventSink, watcher, or log。
