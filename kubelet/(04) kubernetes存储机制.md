@@ -88,6 +88,7 @@ vsphereVolume
 EmptyDir是一个空目录，他的生命周期和所属的 Pod 是完全一致的，可能读者会奇怪，那还要他做什么？
 EmptyDir的用处是，可以在同一 Pod 内的不同容器之间共享工作过程中产生的文件。	
 缺省情况下，EmptyDir 是使用主机磁盘进行存储的，也可以设置emptyDir.medium 字段的值为Memory，来提高运行速度，但是这种设置，对该卷的占用会消耗容器的内存份额。
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -106,9 +107,11 @@ spec:
 ```
 
 #### hostPath
+
 hostpath用于把该容器本地host主机上的文件或者目录挂载到你的容器当中，因为数据只能存在于一个host主机上。
 如果pod发生了迁移，数据并不会发生迁移。
 这种卷一般和DaemonSet搭配使用，用来操作主机文件，例如进行日志采集的 FLK 中的 FluentD 就采用这种方式，加载主机的容器日志目录，达到收集本主机所有日志的目的。
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -131,6 +134,7 @@ spec:
 ```
 
 #### ConfigMap
+
 镜像使用的过程中，经常需要利用配置文件、启动脚本等方式来影响容器的运行方式，如果仅有少量配置，我们可以使用环境变量的方式来进行配置。
 然而对于一些较为复杂的配置，就很难用这种方式进行控制了。
 另外一些敏感信息暴露在 YAML 中也是不合适的。
@@ -138,6 +142,7 @@ spec:
 configMap资源提供了一种将配置数据注入到Pod中的方法。
 存储在ConfigMap对象中的数据可以在configMap类型的卷中引用，然后由运行在Pod中的容器化应用使用。
 当引用一个configMap对象时，可以在卷中提供它的名字来引用它。 您还可以自定义用于ConfigMap中特定条目的路径。
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -239,6 +244,7 @@ secret用于传递敏感信息给pod中的容器使用，使用方式和ConfigMa
 Secret的数据在容器中是以文件的形式保存，容器通过读取文件可以获取所需的数据。
 
 Secret的类型有三种：
+
   * Opaque： 自定义数据内容，默认类型是这个。Key/Value的形式，其中Value需要使用Base64加密。
   * ServiceAccount Token：ServiceAccount的认证内容
   * Dockercfg：和docker镜像仓库的认证相关
@@ -359,6 +365,7 @@ PV是集群中的资源，PVC是对这些资源的请求。两者遵循以下的
 
   1. statically 
 由k8s集群的系统管理员在事先创建好一定数量的PV资源，供上层用户消费使用。这些PV携带着真正可用的底层存储的细节信息。
+
   2. dynamically
 和storageclass相关，由系统来动态完成PV的创建。在这种方式里面，PVC必须请求一个storageclass。
 
@@ -376,6 +383,7 @@ Pod把一个Claim作为一个volume来使用。K8S会根据该cliam来找到对�
 
 #### Reclaiming
 当用户删除一个pv绑定的pvc时，pv就会进行released状态，等待回收处理。处于Released状态的pv需要经过回收处理才能再次使用，回收策略包括：
+
     * Retain，等待人工回收处理
     * Recycle，由k8s自动进行清理，清理成功之后，该pv可以再次绑定使用。原来的数据是已经被删除了的。
     * Delete，直接删除。动态配置的pv继承其StorageClass的回收策略，默认为Delete。管理员应根据用户的期望配置StorageClass。
@@ -384,6 +392,7 @@ Pod把一个Claim作为一个volume来使用。K8S会根据该cliam来找到对�
 
 ### pv支持的volume类型
 PersistentVolume在k8s里面是作为一个plugin的形式实现的，目前k8s支持多种类型的plugin。我们现在主要使用的是：
+
     * RBD (Ceph Block Device)
     * CephFS
     * HostPath (Single node testing only – local storage is not supported in any way and WILL NOT WORK in a multi-node cluster)
@@ -419,6 +428,7 @@ spec:
 申请的容量大小
 
 #### Access Modes
+
     * ReadWriteOnce – the volume can be mounted as read-write by a single node
     * ReadOnlyMany – the volume can be mounted read-only by many nodes
     * ReadWriteMany – the volume can be mounted as read-write by many nodes
@@ -434,6 +444,7 @@ spec:
 
 #### Phase
 一个pv的状态会是下面几种：
+
     * Available – a free resource that is not yet bound to a claim
     * Bound – the volume is bound to a claim
     * Released – the claim has been deleted, but the resource is not yet reclaimed by the cluster
@@ -469,6 +480,7 @@ spec:
 请求资源，就像pod请求cpu、memory一样
 #### Selector
 pvc中声明了label selector，只有符合该label的pv才会该pvc进行绑定。
+
     * matchLabels - the volume must have a label with this value
     * matchExpressions - a list of requirements made by specifying key, list of values, and operator that relates the key and values. Valid operators include In, NotIn, Exists, and DoesNotExist.
 
@@ -480,6 +492,7 @@ pvc不是必须要申请storageClass，这种情况下，也只能和没申请st
 
 #### Phase
 一个pvc的状态会是：
+
     * pending – pvc创建成功之后进行等待状态，等待绑定pv。
     * Bound – 分配pv和pvc进行绑定，进行Bound状态。
 
@@ -595,7 +608,9 @@ spec:
 
 ## 一个组合方案
 从上面的几个概念，可以组合出多个pod使用volume的方案。下面介绍一种的方案：
+
 1.	Secret
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -609,7 +624,9 @@ data:
 其中{{secret}}的值来源于ceph集群为kubernetes用户创建的keyring文件，一般位置是/etc/ceph/ceph.client. kubernetes. Keyring，需要进行base64加密。
 
 2.	StorageClass
+
 StorageClass使用上面名为ceph-secret-user的secret来和底层ceph集群进行交互（创建删除rbd pool、image），yaml文件如下所示：
+
 ```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -625,7 +642,9 @@ parameters:
     userId: kubernetes
     userSecretName: ceph-secret-user
 ```
+
 其中几个属性介绍如下：
+
     * monitors：ceph monitor的IP:Port（也可以直接写IP即可，或域名），可以通过ceph -s查看。
     * adminId：ceph集群的管理员Id
     * adminSecretName：管理员Id用的 secret
@@ -638,7 +657,9 @@ parameters:
 至此，用户只需要创建pvc即可，后续的pv和rbd Image会由系统来自动创建。
 
 3.	PVC
+
 创建一个名为registry的pvc
+
 ```yaml
 kind: PersistentVolumeClaim
 apiVersion: v1
@@ -700,6 +721,7 @@ spec:
 ```
 
 ## 总结
+
 两种存储卷：普通Volume 和Persistent Volume。
 
 普通Volume在定义Pod的时候直接定义，Persistent Volume通过Persistent Volume Claim来动态绑定。
@@ -707,6 +729,7 @@ PV可以手动创建,也可以通过StorageClass来动态创建。
 
               
 ## 参考
+
 https://kubernetes.io/docs/concepts/storage/volumes/
 
 http://blog.csdn.net/liukuan73/article/details/60089305
