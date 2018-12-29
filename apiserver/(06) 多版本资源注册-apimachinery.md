@@ -125,7 +125,7 @@ type VersionInterfaces struct {
 	MetadataAccessor //
 }
 ```
-关于的介绍，可以查看[StorageVersions寻根]()一文。
+关于`GroupMeta`的介绍，可以查看[StorageVersions寻根]()一文。
 
 查看type GroupMeta struct其实现的函数功能
 ```go
